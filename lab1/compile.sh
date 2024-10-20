@@ -1,1 +1,1 @@
-g++ -fopenmp flpenum.cpp -o flpenum
+g++ -W -Wall -Wextra -fopenmp flpenum.cpp -o flpenum
