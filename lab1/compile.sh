@@ -1,0 +1,1 @@
+g++ -fopenmp flpenum.cpp -o flpenum
