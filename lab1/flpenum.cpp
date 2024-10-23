@@ -33,6 +33,7 @@ int increaseX(int* X, int index, int maxindex);
 
 //=============================================================================
 void display_results(char *filename);
+void write_times(double t_start, double t_matrix, double t_finish);
 const int NUM_THREADS = 4;
 
 int main() {
@@ -43,16 +44,16 @@ int main() {
 
     //----- Atstumu matricos skaiciavimas -------------------------------------
     distanceMatrix = new double*[numDP];
-    #pragma omp parallel
-    {
-        #pragma omp for schedule(guided)
-        for (int i=0; i<numDP; i++) {
-            distanceMatrix[i] = new double[i+1];
-            for (int j=0; j<=i; j++) {
-                distanceMatrix[i][j] = HaversineDistance(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
-            }
+    // #pragma omp parallel
+    // {
+        // #pragma omp for schedule(guided)
+    for (int i=0; i<numDP; i++) {
+        distanceMatrix[i] = new double[i+1];
+        for (int j=0; j<=i; j++) {
+            distanceMatrix[i][j] = HaversineDistance(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
         }
     }
+    // }
     double t_matrix = getTime();
     cout << "Matricos skaiciavimo trukme: " << t_matrix - t_start << endl;
 
@@ -102,6 +103,7 @@ int main() {
 
     display_results("stdout");
     display_results("new.dat");
+    write_times(t_start, t_matrix, t_finish);
 }
 
 //===== Funkciju implementacijos (siu funkciju LYGIAGRETINTI NEREIKIA) ========
@@ -189,6 +191,8 @@ int increaseX(int *X, int index, int maxindex) {
     return 1;
 }
 
+// =============
+
 void display_results(char *filename)
 {
     const char *cmp = "stdout";
@@ -202,4 +206,18 @@ void display_results(char *filename)
 
     for (int i = 0; i < numX; i++) { fprintf(fp, "%i\t", bestX[i]); }
     fprintf(fp, "\t%.3f\n", bestU);
+}
+
+void write_times(double t_start, double t_matrix, double t_finish) {
+    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
+    sprintf(filename_buffer, "times_no_matrix_%i.tsv", NUM_THREADS);
+
+    FILE *fp = fopen(filename_buffer, "a+");
+
+    fprintf(fp, "%i\t%f\t%f\t%f\n",
+        NUM_THREADS,
+        t_matrix - t_start,
+        t_finish - t_matrix,
+        t_finish - t_start
+    );
 }

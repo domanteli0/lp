@@ -1,6 +1,9 @@
 #import "@preview/mitex:0.2.4": *
-#import "@preview/plotst:0.2.0": *
-#import "@preview/oxifmt:0.2.0": strfmt
+// #import "@preview/plotst:0.2.0": *
+// #import "@preview/oxifmt:0.2.0": strfmt
+// #import "@preview/cetz:0.3.1"
+#import "@preview/cetz:0.3.1": canvas, draw
+#import "@preview/cetz-plot:0.1.0": plot, chart
 
 #let pageref(label) = context {
   let loc = locate(label)
@@ -189,90 +192,37 @@ int *manyXs = new int[NUM_THREADS * numX];
 
 === Rezultatai
 
-// === NUM_THREADS: 1 ===
-#let values1 = (17.2353, 17.0992, 17.4169, 17.5637, 17.3402)
-#let core1 = (values1.slice(0, count: 3).sum() / 3)
+// #let results = csv("lab1/times_no_matrix_1.tsv", delimiter: "\t")
+// #table(
+//   columns: 4,
+//   rows: 4,
+//   [*Threads*],
+//   [$"t_matrix" - "t_start"$],
+//   [$"t_finish" - "t_matrix"$],
+//   [$"t_finish" - "t_start"$],
+//   ..results.flatten(),
+// )
 
-#let all_values1 = (21.8994, 21.8072, 22.1216, 22.2638, 21.9891)
-#let all1 = (all_values1.slice(0, count: 3).sum() / 3)
+#let read_data(file: "lab1/no_matrix_1.tsv", column: 1) = {
+  let results = csv(file, delimiter: "\t")
 
+  let values = results
+    .map(r => float(r.at(column)))
+    .slice(0, count: 3)
+    .sum()
+  
+  values / 3
+}
 
-// ```
-// Matrix: 4.66416
-// Spr: 17.2353
-// All: 21.8994
+#let core1 = read_data(file: "lab1/no_matrix_1.tsv", column: 2)
+#let all1 = read_data(file: "lab1/no_matrix_1.tsv", column: 3)
 
-// Matrix: 4.70804
-// Spr: 17.0992
-// All: 21.8072
+#let core2 = read_data(file: "lab1/no_matrix_2.tsv", column: 2)
+#let all2 = read_data(file: "lab1/no_matrix_2.tsv", column: 3)
 
-// Matrix: 4.70465
-// Spr: 17.4169
-// All: 22.1216
+#let core4 = read_data(file: "lab1/no_matrix_4.tsv", column: 2)
+#let all4 = read_data(file: "lab1/no_matrix_4.tsv", column: 3)
 
-// Matrix: 4.70014
-// Spr: 17.5637
-// All: 22.2638
-
-// Matrix: 4.6489
-// Spr: 17.3402
-// All: 21.9891
-// ```
-
-// === NUM_THREADS: 2 ===
-#let values2 = (9.29227, 9.08357, 9.14368, 9.09421, 9.13264)
-#let core2 = (values2.slice(0, count: 3).sum() / 3)
-
-#let all_values2 = (13.8621, 13.6069, 13.756, 13.4887, 13.7164)
-#let all2 = (all_values2.slice(0, count: 3).sum() / 3)
-
-// Matricos skaiciavimo trukme: 4.56983
-// Sprendinio paieskos trukme: 9.29227
-// Algoritmo vykdymo trukme: 13.8621
-
-// Matricos skaiciavimo trukme: 4.52329
-// Sprendinio paieskos trukme: 9.08357
-// Algoritmo vykdymo trukme: 13.6069
-
-// Matricos skaiciavimo trukme: 4.61234
-// Sprendinio paieskos trukme: 9.14368
-// Algoritmo vykdymo trukme: 13.756
-
-// Matricos skaiciavimo trukme: 4.39453
-// Sprendinio paieskos trukme: 9.09421
-// Algoritmo vykdymo trukme: 13.4887
-
-// Matricos skaiciavimo trukme: 4.58379
-// Sprendinio paieskos trukme: 9.13264
-// Algoritmo vykdymo trukme: 13.7164
-
-
-// === NUM_THREADS: 4 ===
-#let values4 = (4.77772, 4.73582, 4.85159, 4.63965, 4.51038)
-#let core4 = (values4.slice(0, count: 3).sum() / 3)
-
-#let all_values4 = (9.35896, 9.23228, 9.38276, 8.85537, 8.23031)
-#let all4 = (all_values4.slice(0, count: 3).sum() / 3)
-
-// Matricos skaiciavimo trukme: 4.58124
-// Sprendinio paieskos trukme: 4.77772
-// Algoritmo vykdymo trukme: 9.35896
-
-// Matricos skaiciavimo trukme: 4.49646
-// Sprendinio paieskos trukme: 4.73582
-// Algoritmo vykdymo trukme: 9.23228
-
-// Matricos skaiciavimo trukme: 4.53116
-// Sprendinio paieskos trukme: 4.85159
-// Algoritmo vykdymo trukme: 9.38276
-
-// Matricos skaiciavimo trukme: 4.21572
-// Sprendinio paieskos trukme: 4.63965
-// Algoritmo vykdymo trukme: 8.85537
-
-// Matricos skaiciavimo trukme: 3.71994
-// Sprendinio paieskos trukme: 4.51038
-// Algoritmo vykdymo trukme: 8.23031
 
 #let beta = (core1 / all1)
 #let alpha = 1 - beta
@@ -289,31 +239,50 @@ int *manyXs = new int[NUM_THREADS * numX];
 )
 #let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)))
 
-// Create the axes for the overlay plot
-#let x_axis = axis(min: 0, max: 4, step: 1, location: "bottom", title: "procesorių skaičius")
-#let y_axis = axis(min: 0, max: 5, step: 1, location: "left", helper_lines: false, title: "pagreitėjimas")
+#align(center)[
+  #canvas({
+    import draw: *
 
-// create a plot for each individual plot type and save the render call
-#let pl_core = plot(data: data_core, axes: (x_axis, y_axis))
-#let dp_core = graph_plot(pl_core, (50%, 25%), caption: "pagreitėjimo ir procesorių skaičiaus santykis", stroke: (paint: red, thickness: 1pt, dash: "dashed"))
+    // Set-up a thin axis style
+    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
 
-#let pl_all = plot(data: data_all, axes: (x_axis, y_axis))
-#let dp_all = graph_plot(pl_all, (50%, 25%), markings: "circle", stroke: (paint: green, thickness: 1pt, dash: "dashed"))
+    plot.plot(
+      x-min: 0.9, x-max: 4.2,
+      y-min: 0.9, y-max: 4.2,
+      size: (10, 6),
+      x-tick-step: 1,
+      y-tick-step: 0.5,
+      legend: auto,
+      {
+        let domain = (1, 4.5)
 
-#let pl_linear = plot(data: data_linear, axes: (x_axis, y_axis))
-#let dp_linear = graph_plot(pl_linear, (50%, 25%), stroke: blue)
+        plot.add(
+          data_core,
+          style: (color: rgb(255, 0, 0)), 
+          label: "core"
+        )
 
-#let pl_S_p = plot(data: data_S_p, axes: (x_axis, y_axis))
-#let dp_S_p = graph_plot(pl_S_p, (50%, 25%), stroke: black)
+        plot.add(
+          data_all,
+          style: (color: rgb("#acc3ac")), 
+          label: "all"
+        )
 
-#align(center)[#box()[
-  #overlay((dp_core, dp_linear, dp_all, dp_S_p), (50%, 25%))
-  #place(left, dx: 105%, dy: -87%)[Tiesinis pagreitėjimas]
-  #place(left, dx: 105%, dy: -79%)[Sprendimo paieškos pagreitėjimas]
-  // #place(left, dx: 105%, dy: -39.5%)[#mitex(`$\tilde{S}_p$`)]
-  #place(left, dx: 105%, dy: -64%)[Teorinis pagreitėjimas]
-  #place(left, dx: 105%, dy: -58%)[Programos pagreitėjimas]
-]]
+        plot.add(
+          data_linear,
+          style: (color: rgb("#acc3ac")), 
+          label: "linear"
+        )
+
+        plot.add(
+          data_S_p,
+          style: (color: rgb("#acc3ac")), 
+          label: $S_p$
+        )
+      })
+  })
+]
 
 #pagebreak()
 == Antra dalis
@@ -460,30 +429,47 @@ distanceMatrix = new double*[numDP];
 
 #let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)))
 
-// Create the axes for the overlay plot
-#let x_axis = axis(min: 0, max: 4, step: 1, location: "bottom", title: "procesorių skaičius")
-#let y_axis = axis(min: 0, max: 5, step: 1, location: "left", helper_lines: false, title: "pagreitėjimas")
+#align(center)[
+  #canvas({
+    import draw: *
 
-// create a plot for each individual plot type and save the render call
-#let pl_core = plot(data: data_core, axes: (x_axis, y_axis))
-#let dp_core = graph_plot(pl_core, (50%, 25%), caption: "pagreitėjimo ir procesorių skaičiaus santykis", stroke: (paint: red, thickness: 1pt, dash: "dashed"))
+    // Set-up a thin axis style
+    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
 
-#let pl_all = plot(data: data_all, axes: (x_axis, y_axis))
-#let dp_all = graph_plot(pl_all, (50%, 25%), markings: "circle", stroke: (paint: green, thickness: 1pt, dash: "dashed"))
+    plot.plot(
+      x-min: 0.9, x-max: 4.2,
+      y-min: 0.9, y-max: 4.2,
+      size: (10, 6),
+      x-tick-step: 1,
+      y-tick-step: 0.5,
+      legend: auto,
+      {
+        let domain = (1, 4.5)
 
-#let pl_linear = plot(data: data_linear, axes: (x_axis, y_axis))
-#let dp_linear = graph_plot(pl_linear, (50%, 25%), stroke: blue)
+        plot.add(
+          data_all,
+          style: (color: rgb("#acc3ac")), 
+          label: "all"
+        )
 
-#let pl_matrix = plot(data: data_matrix, axes: (x_axis, y_axis))
-#let dp_matrix = graph_plot(pl_matrix, (50%, 25%), stroke: (paint: purple, thickness: 1pt, dash: "dashed"))
+        plot.add(
+          data_core,
+          style: (color: rgb(255, 0, 0)), 
+          label: "core"
+        )
 
-// #let pl_S_p = plot(data: data_S_p, axes: (x_axis, y_axis))
-// #let dp_S_p = graph_plot(pl_S_p, (50%, 25%), stroke: black)
+        plot.add(
+          data_linear,
+          style: (color: rgb("#acc3ac")), 
+          label: "linear"
+        )
 
-#align(center)[#box()[
-  #overlay((dp_core, dp_linear, dp_all, dp_matrix), (50%, 25%))
-  #place(left, dx: 100%, dy: -88%)[Tiesinis pagreitėjimas] // dp_linear
-  #place(left, dx: 100%, dy: -76%)[Sprendimo paieškos pagreitėjimas] // do_core
-  #place(left, dx: 100%, dy: -83%)[Programos pagreitėjimas] // dp_all
-  #place(left, dx: 100%, dy: -94%)[Matricos skaičiavimo pagreitėjimas] // dp_matrix
-]]
+        plot.add(
+          data_matrix,
+          style: (color: rgb("#acc3ac")), 
+          label: "matrix",
+        )
+      })
+  })
+]
