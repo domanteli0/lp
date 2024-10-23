@@ -4,6 +4,9 @@
 // #import "@preview/cetz:0.3.1"
 #import "@preview/cetz:0.3.1": canvas, draw
 #import "@preview/cetz-plot:0.1.0": plot, chart
+#import "@preview/codly:1.0.0"
+
+#show: codly.codly-init.with()
 
 #let pageref(label) = context {
   let loc = locate(label)
@@ -122,10 +125,8 @@ Tuo tarpu funkcija `evaluateSolution` (@evaluateSolution) nekeičia jokių globa
   placement: none,
 ```c
 double evaluateSolution(int *X) {
-    double U = 0;
-    double totalU = 0;
-    int bestPF;
-    int bestX;
+    double U = 0; double totalU = 0;
+    int bestPF, bestX;
     double d;
 
     for (int i=0; i<numDP; i++) {
@@ -151,7 +152,6 @@ double evaluateSolution(int *X) {
 ) <evaluateSolution>
 
 
-#pagebreak()
 === Sprendimo paralelizavimas
 
 Dėl anksčiau išvardintų priežąsčių `increaseX` apskaičiavimas išskiriamas į `critical` bloką, tam, kad tik viena gija galėtų modifikuoti `X` reikšmę vienu metu. Apskaičiavus ir atnaujinus `X`, kiekviena gija susikuria savo `X` kopiją - `localX`. Šią kopiją galima naudoti `evaluateSolution` nes jinai ne bus keičiama. Kiekviena gija taip pat gauna `u` kopiją į kurią įrašo `evaluateSolution` apskaičiuotą reikšmę. Ciklo gale vėl naudojamas `critical`, tam kad tik viena gija vienu metu galėtų įvertinti `u > bestU` ir pakeisti `bestU` ir `bestX` reikšmes.
@@ -189,19 +189,18 @@ int *manyXs = new int[NUM_THREADS * numX];
   caption: [Paralelizuotas visų galimų sprendinių perrinkimas]
 )
 
-
 === Rezultatai
 
-#let results = csv("lab1/no_matrix_1.tsv", delimiter: "\t")
-#table(
-  columns: 4,
-  rows: 4,
-  [*Threads*],
-  [$"t_matrix" - "t_start"$],
-  [$"t_finish" - "t_matrix"$],
-  [$"t_finish" - "t_start"$],
-  ..results.flatten(),
-)
+// #let results = csv("lab1/no_matrix_1.tsv", delimiter: "\t")
+// #table(
+//   columns: 4,
+//   rows: 4,
+//   [*Threads*],
+//   [$"t_matrix" - "t_start"$],
+//   [$"t_finish" - "t_matrix"$],
+//   [$"t_finish" - "t_start"$],
+//   ..results.flatten(),
+// )
 
 #let read_data(file: "lab1/no_matrix_1.tsv", column: 1) = {
   let results = csv(file, delimiter: "\t")
@@ -244,41 +243,47 @@ int *manyXs = new int[NUM_THREADS * numX];
     import draw: *
 
     // Set-up a thin axis style
-    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
-              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%),
+    )
 
     plot.plot(
       x-min: 0.9, x-max: 4.2,
-      y-min: 0.9, y-max: 4.2,
+      y-min: 0.9, y-max: 4.5,
       size: (10, 6),
       x-tick-step: 1,
-      y-tick-step: 0.5,
-      legend: auto,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      // legend: auto,
       {
-        let domain = (1, 4.5)
 
         plot.add(
           data_core,
-          style: (color: rgb(255, 0, 0)), 
-          label: "core"
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: "Sprendimo paieškos pagreitėjimas"
         )
 
         plot.add(
           data_all,
-          style: (color: rgb("#acc3ac")), 
-          label: "all"
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: "Programos pagreitėjimas"
         )
 
         plot.add(
           data_linear,
-          style: (color: rgb("#acc3ac")), 
-          label: "linear"
+          style: (stroke: (paint: blue)), 
+          label: "Tiesinis pagreitėjimas"
         )
 
         plot.add(
           data_S_p,
-          style: (color: rgb("#acc3ac")), 
-          label: $S_p$
+          style: (stroke: (paint: rgb("#ff8104"))), 
+          label: "Teorinis pagreitėjimas"
         )
       })
   })
@@ -350,37 +355,41 @@ distanceMatrix = new double*[numDP];
               legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
 
     plot.plot(
-      x-min: 0.9, x-max: 4.2,
-      y-min: 0.9, y-max: 4.2,
+      x-min: 0.9, x-max: 4.1,
+      y-min: 0.9, y-max: 4.1,
       size: (10, 6),
       x-tick-step: 1,
-      y-tick-step: 0.5,
-      legend: auto,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
       {
-        let domain = (1, 4.5)
-
-        plot.add(
-          data_all,
-          style: (color: rgb("#acc3ac")), 
-          label: "all"
-        )
 
         plot.add(
           data_core,
-          style: (color: rgb(255, 0, 0)), 
-          label: "core"
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: "Sprendimo paieškos pagreitėjimas"
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: "Programos pagreitėjimas"
         )
 
         plot.add(
           data_linear,
-          style: (color: rgb("#acc3ac")), 
-          label: "linear"
+          style: (stroke: (paint: blue)), 
+          label: "Tiesinis pagreitėjimas"
         )
 
         plot.add(
           data_matrix,
-          style: (color: rgb("#acc3ac")), 
-          label: "matrix",
+          // mark: "x", mark-size: 0.15,
+          style: (stroke: (paint: orange)), 
+          label: "Matricos skaičiavimo pagreitėjimas",
         )
       })
   })
