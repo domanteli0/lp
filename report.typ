@@ -289,7 +289,6 @@ int *manyXs = new int[NUM_THREADS * numX];
   })
 ]
 
-#pagebreak()
 == Antra dalis
 
 Šioje vietoje `for` direktyva atrodo lengvai pritaikoma, kadangi atstumų matricos kiekvieną eilutę galima apskaičiuoti nepriklausomai nuo to ar praeitos eilutės yra apskaičiuotos. Tačiau, pirmos eilutėms reikia žymiau mažiau laiko negu paskutinesnėms, todėl pritaikyta `guided` paskirstymo (angl. _scheduling_) direktyva. Tai leidžia efektyviau paskirstyti ciklų darbą per skirtingas gijas.
@@ -312,7 +311,6 @@ distanceMatrix = new double*[numDP];
             );
         }
     }
-}
 }
 ```,
   caption: [Paralelizuotas atstumų matricos skaičiavimas]

@@ -209,15 +209,15 @@ void display_results(char *filename)
 }
 
 void write_times(double t_start, double t_matrix, double t_finish) {
-    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
-    sprintf(filename_buffer, "with_matrix_%i.tsv", NUM_THREADS);
+    // char *filename_buffer = (char *) calloc(sizeof(char), 1000);
+    // sprintf(filename_buffer, "no_matrix_%i.tsv", NUM_THREADS);
 
-    FILE *fp = fopen(filename_buffer, "a+");
+    // FILE *fp = fopen(filename_buffer, "a+");
 
-    fprintf(fp, "%i\t%f\t%f\t%f\n",
-        NUM_THREADS,
-        t_matrix - t_start,
-        t_finish - t_matrix,
-        t_finish - t_start
-    );
+    // fprintf(fp, "%i\t%f\t%f\t%f\n",
+    //     NUM_THREADS,
+    //     t_matrix - t_start,
+    //     t_finish - t_matrix,
+    //     t_finish - t_start
+    // );
 }
