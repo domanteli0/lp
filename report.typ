@@ -192,16 +192,16 @@ int *manyXs = new int[NUM_THREADS * numX];
 
 === Rezultatai
 
-// #let results = csv("lab1/times_no_matrix_1.tsv", delimiter: "\t")
-// #table(
-//   columns: 4,
-//   rows: 4,
-//   [*Threads*],
-//   [$"t_matrix" - "t_start"$],
-//   [$"t_finish" - "t_matrix"$],
-//   [$"t_finish" - "t_start"$],
-//   ..results.flatten(),
-// )
+#let results = csv("lab1/no_matrix_1.tsv", delimiter: "\t")
+#table(
+  columns: 4,
+  rows: 4,
+  [*Threads*],
+  [$"t_matrix" - "t_start"$],
+  [$"t_finish" - "t_matrix"$],
+  [$"t_finish" - "t_start"$],
+  ..results.flatten(),
+)
 
 #let read_data(file: "lab1/no_matrix_1.tsv", column: 1) = {
   let results = csv(file, delimiter: "\t")
@@ -315,105 +315,18 @@ distanceMatrix = new double*[numDP];
 
 === Rezultatai
 
-/// MATRIX PARALLELIZATION
+#let core1 = read_data(file: "lab1/with_matrix_1.tsv", column: 2)
+#let all1 = read_data(file: "lab1/with_matrix_1.tsv", column: 3)
+#let matrix1 = read_data(file: "lab1/with_matrix_1.tsv", column: 1)
 
-// === NUM_THREADS: 1 ===
+#let core2 = read_data(file: "lab1/with_matrix_2.tsv", column: 2)
+#let all2 = read_data(file: "lab1/with_matrix_2.tsv", column: 3)
+#let matrix2 = read_data(file: "lab1/with_matrix_2.tsv", column: 1)
 
-#let values1 = (17.3815, 17.4154, 17.3834, 16.0638, 17.4336)
-#let core1 = (values1.slice(0, count: 3).sum() / 3)
+#let core4 = read_data(file: "lab1/with_matrix_4.tsv", column: 2)
+#let all4 = read_data(file: "lab1/with_matrix_4.tsv", column: 3)
+#let matrix4 = read_data(file: "lab1/with_matrix_4.tsv", column: 1)
 
-#let matrix_values1 = (4.53539, 4.54804, 4.54235, 4.59599, 4.54931)
-#let matrix1 = (matrix_values1.slice(0, count: 3).sum() / 3)
-
-#let all_values1 = (21.9169, 21.9635, 21.9257, 20.6598, 21.9829)
-#let all1 = (all_values1.slice(0, count: 3).sum() / 3)
-
-// Matricos skaiciavimo trukme: 4.53539
-// Sprendinio paieskos trukme: 17.3815
-// Algoritmo vykdymo trukme: 21.9169
-// 
-// Matricos skaiciavimo trukme: 4.54804
-// Sprendinio paieskos trukme: 17.4154
-// Algoritmo vykdymo trukme: 21.9635
-// 
-// Matricos skaiciavimo trukme: 4.54235
-// Sprendinio paieskos trukme: 17.3834
-// Algoritmo vykdymo trukme: 21.9257
-// 
-// Matricos skaiciavimo trukme: 4.59599
-// Sprendinio paieskos trukme: 16.0638
-// Algoritmo vykdymo trukme: 20.6598
-// 
-// Matricos skaiciavimo trukme: 4.54931
-// Sprendinio paieskos trukme: 17.4336
-// Algoritmo vykdymo trukme: 21.9829
-
-// === NUM_THREADS: 2 ===
-
-#let values2 = (8.71614, 9.21011, 9.12135, 8.66471, 8.94833)
-#let core2 = (values2.slice(0, count: 3).sum() / 3)
-
-#let matrix_values2 = (2.17127, 2.29965, 2.3158, 2.29705, 2.00836)
-#let matrix2 = (matrix_values2.slice(0, count: 3).sum() / 3)
-
-#let all_values2 = (10.8874, 11.5098, 11.4371, 10.9618, 10.9567)
-#let all2 = (all_values2.slice(0, count: 3).sum() / 3)
-
-// Matricos skaiciavimo trukme: 2.17127
-// Sprendinio paieskos trukme: 8.71614
-// Algoritmo vykdymo trukme: 10.8874
-// 
-// Matricos skaiciavimo trukme: 2.29965
-// Sprendinio paieskos trukme: 9.21011
-// Algoritmo vykdymo trukme: 11.5098
-// 
-// Matricos skaiciavimo trukme: 2.3158
-// Sprendinio paieskos trukme: 9.12135
-// Algoritmo vykdymo trukme: 11.4371
-// 
-// Matricos skaiciavimo trukme: 2.29705
-// Sprendinio paieskos trukme: 8.66471
-// Algoritmo vykdymo trukme: 10.9618
-// 
-// Matricos skaiciavimo trukme: 2.00836
-// Sprendinio paieskos trukme: 8.94833
-// Algoritmo vykdymo trukme: 10.9567
-
-// === NUM_THREADS: 4 ===
-
-#let values4 = (4.71473, 4.87095, 4.70493, 4.65552, 4.50287)
-#let core4 = (values4.slice(0, count: 3).sum() / 3)
-
-#let matrix_values4 = (1.08591, 1.04877, 1.03318, 1.05278, 1.06363)
-#let matrix4 = (matrix_values4.slice(0, count: 3).sum() / 3)
-
-#let all_values4 = (5.80063, 5.91972, 5.73811, 5.70831, 5.5665)
-#let all4 = (all_values4.slice(0, count: 3).sum() / 3)
-
-// Matricos skaiciavimo trukme: 1.08591
-// Sprendinio paieskos trukme: 4.71473
-// Algoritmo vykdymo trukme: 5.80063
-// 
-// Matricos skaiciavimo trukme: 1.04877
-// Sprendinio paieskos trukme: 4.87095
-// Algoritmo vykdymo trukme: 5.91972
-// 
-// Matricos skaiciavimo trukme: 1.03318
-// Sprendinio paieskos trukme: 4.70493
-// Algoritmo vykdymo trukme: 5.73811
-// 
-// Matricos skaiciavimo trukme: 1.05278
-// Sprendinio paieskos trukme: 4.65552
-// Algoritmo vykdymo trukme: 5.70831
-// 
-// Matricos skaiciavimo trukme: 1.06363
-// Sprendinio paieskos trukme: 4.50287
-// Algoritmo vykdymo trukme: 5.5665
-
-#let beta = (core1 / all1)
-#let alpha = 1 - beta
-
-// Create the data for the two plots to overlay
 #let data_core = (
   (1, core1 / core1), (2, core1 / core2), (4, core1 / core4)
 )
@@ -427,7 +340,6 @@ distanceMatrix = new double*[numDP];
   (1, matrix1 / matrix1), (2, matrix1 / matrix2), (4, matrix1 / matrix4)
 )
 
-#let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)))
 
 #align(center)[
   #canvas({
