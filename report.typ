@@ -46,7 +46,9 @@
 
 = Užduotis \#1
 
-== Pagrindinės įžvalgos
+== Pirma dalis
+
+=== Paralelizavimo galimybių analizė
 
 Pirmasis skaičiavimo skaičiavimo ciklas (@first_cycle) palyginus užtrunka nedaug laiko (apie ~0.002 sekundės). Praktiniems tikslams, jį galima ignoruoti.
 
@@ -79,13 +81,13 @@ while (increaseX(X, numX-1, numCL) == true) {
   caption: [Visų galimų sprendinių perrinkimas]
 )
 
-Šį ciklą iš esmės yra ne paprasta parelilizuoti, nes:
+Šio ciklo iš esmės "aklai" parelilizuoti negalima, nes reikia atsižvelgti į tai kad:
 
   - `increaseX` - keičia masyvo `X` reikšmę (@increseX), ir ne tik `index`-ąjį elementą, rekursyviai kviesdamas save sumažina `index` reikšmę vienu, t.y. iškvietus `increaseX` visos masyvos reikšmės yra keičiamos. To pasekmė, kad `index`-ojo elemento skaičiavimo negalima paskirstyti skirtingoms gijoms, kitaip vėlesnėms gijoms reikėtų laukti, kol praeita gija baigs savo darbą, visiškai nustelbiant parelelizavimo naudą.
 
-  - `increaseX` skaičiavimai priklauso vienas nuo kito, t.y. norint apskaičiuoti `X` reikšmę $n$-ame ciklo vykdyme, reikia pirma apskaičiuoti `X` reikšmę $(n-1)$-ame ciklo vykdyme. Analogiškai negalima paralelizuoti ir nes kitos gijos lauktų, kol praeita gija baigs savo darbą.
+  - `increaseX` skaičiavimai priklauso vienas nuo kito, t.y. norint apskaičiuoti `X` reikšmę $n$-ame ciklo vykdyme, reikia pirma apskaičiuoti `X` reikšmę $(n-1)$-ame ciklo vykdyme. Analogiškai negalima paralelizuoti nes kitos gijos lauktų, kol praeita gija baigs savo darbą.
 
-  - `if (u > bestU) { ... }` irgi gali tik vienas ciklas vienu metu, nes `bestU` ir `X` pakeitimas turi būti atliekamas "žingsniu".
+  - `if (u > bestU) { ... }` irgi gali tik vienas ciklas vienu metu, nes `bestU` ir `X` pakeitimas turi būti atliekamas "žingsniu" - t.y. atomiškai.
 
 Iš esmės neperrašius `increaseX`, šios funkcijos ir jos kvietimo cikle, yra nepraktiška parelilizuoti.
 
@@ -108,10 +110,10 @@ int increaseX(int *X, int index, int maxindex) {
     return 1;
 }
 ```,
-  caption: [funkcijos `increseX` apibrėžimas]
+  caption: [Funkcija `increseX`]
 ) <increseX>
 
-Tuo tarpu funkcija `evaluateSolution` nekeičia jokių globalių kintamųjų ar savo argumentų. Analitiškai žiūrint galima spėti, kad čia ir didžioji dalis skaičiavimo laiko yra sugaištama. Teorinis šios funkcijos "big-O" yra $O(#raw("numDP") dot #raw("numX"))$, tuo tarpu `increseX` rekursyviai save gali iškviesti daugiausiai `numX` kartų.
+Tuo tarpu funkcija `evaluateSolution` (@evaluateSolution) nekeičia jokių globalių kintamųjų ar savo argumentų. Analitiškai žiūrint galima spėti, kad čia ir didžioji dalis skaičiavimo laiko yra sugaištama. Teorinis šios funkcijos _big O_ yra $O(#raw("numDP") dot #raw("numX"))$, tuo tarpu `increseX` rekursyviai save gali iškviesti daugiausiai `numX` kartų.
 
 #figure(
   placement: none,
@@ -123,8 +125,6 @@ double evaluateSolution(int *X) {
     int bestX;
     double d;
 
-    #pragma omp parallel reduction (+:U, totalU) private(bestPF, bestX, d)
-    #pragma omp for
     for (int i=0; i<numDP; i++) {
         totalU += demandPoints[i][2];
         bestPF = 1e5;
@@ -144,18 +144,58 @@ double evaluateSolution(int *X) {
     return U/totalU*100;
 }
 ```,
-  caption: [Paralelizuota funkcija `evaluateSolution`]
+  caption: [Funkcija `evaluateSolution`]
 ) <evaluateSolution>
 
-@evaluateSolution esantį `for` ciklą galima parelilizuoti, kadangi `bestPF`, `bestX`, `d` kintamiesiems ciklo viduje prieš jų panaudojimą priskiriamos tų pačių konstantų reikšmės ir kaip minėta `X` reikšmė nekeičiama. Kiekvienai gijai sukurianant atskirą `bestPF`, `bestX`, `d` kopiją išvengiamos "data-race" problemos (panaudojant `private` direktyvą). Už `for` ciklo ribų reikšmingi tik `totalU` ir `U` kintamieji, juos apsaugi nuo "data-race" galima apsaugti panaudojant `reduce` direktyvą, kadangi jie naudojami tik galutiniui rezultatui susumuoti.
 
-== Rezultatai \#1
+#pagebreak()
+=== Sprendimo paralelizavimas
+
+Dėl anksčiau išvardintų priežąsčių `increaseX` apskaičiavimas išskiriamas į `critical` bloką, tam, kad tik viena gija galėtų modifikuoti `X` reikšmę vienu metu. Apskaičiavus ir atnaujinus `X`, kiekviena gija susikuria savo `X` kopiją - `localX`. Šią kopiją galima naudoti `evaluateSolution` nes jinai ne bus keičiama. Kiekviena gija taip pat gauna `u` kopiją į kurią įrašo `evaluateSolution` apskaičiuotą reikšmę. Ciklo gale vėl naudojamas `critical`, tam kad tik viena gija vienu metu galėtų įvertinti `u > bestU` ir pakeisti `bestU` ir `bestX` reikšmes.
+
+#figure(
+  placement: none,
+```c
+bool increased = true;
+int *manyXs = new int[NUM_THREADS * numX];
+
+#pragma omp parallel private(u)
+{
+    while (increased) {
+        int thread_id = omp_get_thread_num();
+        int *localX = manyXs + (thread_id * numX);
+        
+        #pragma omp critical(increaseX)
+        {
+            increased = increaseX(X, numX-1, numCL);
+            memcpy(localX, X, sizeof(int) * numX);
+        }
+        
+        u = evaluateSolution(localX);
+
+        #pragma omp critical(best)
+        {
+            if (u > bestU) {
+                bestU = u;
+                memcpy(bestX, localX, sizeof(int) * numX);
+            }
+        }
+    }
+}
+```,
+  caption: [Paralelizuotas visų galimų sprendinių perrinkimas]
+)
+
+
+=== Rezultatai
 
 // === NUM_THREADS: 1 ===
 #let values1 = (17.2353, 17.0992, 17.4169, 17.5637, 17.3402)
 #let core1 = (values1.slice(0, count: 3).sum() / 3)
 
-// NUM_THREADS = 1
+#let all_values1 = (21.8994, 21.8072, 22.1216, 22.2638, 21.9891)
+#let all1 = (all_values1.slice(0, count: 3).sum() / 3)
+
 
 // ```
 // Matrix: 4.66416
@@ -183,6 +223,9 @@ double evaluateSolution(int *X) {
 #let values2 = (9.29227, 9.08357, 9.14368, 9.09421, 9.13264)
 #let core2 = (values2.slice(0, count: 3).sum() / 3)
 
+#let all_values2 = (13.8621, 13.6069, 13.756, 13.4887, 13.7164)
+#let all2 = (all_values2.slice(0, count: 3).sum() / 3)
+
 // Matricos skaiciavimo trukme: 4.56983
 // Sprendinio paieskos trukme: 9.29227
 // Algoritmo vykdymo trukme: 13.8621
@@ -208,6 +251,9 @@ double evaluateSolution(int *X) {
 #let values4 = (4.77772, 4.73582, 4.85159, 4.63965, 4.51038)
 #let core4 = (values4.slice(0, count: 3).sum() / 3)
 
+#let all_values4 = (9.35896, 9.23228, 9.38276, 8.85537, 8.23031)
+#let all4 = (all_values4.slice(0, count: 3).sum() / 3)
+
 // Matricos skaiciavimo trukme: 4.58124
 // Sprendinio paieskos trukme: 4.77772
 // Algoritmo vykdymo trukme: 9.35896
@@ -228,31 +274,91 @@ double evaluateSolution(int *X) {
 // Sprendinio paieskos trukme: 4.51038
 // Algoritmo vykdymo trukme: 8.23031
 
+#let beta = (core1 / all1)
+#let alpha = 1 - beta
 
 // Create the data for the two plots to overlay
-#let data_scatter = (
+#let data_core = (
   (1, core1 / core1), (2, core1 / core2), (4, core1 / core4)
 )
-#let data_graph = (
-  (0, 1), (1, 2), (2, 1)
+#let data_all = (
+  (1, all1 / all1), (2, all1 / all2), (4, all1 / all4)
 )
+#let data_linear = (
+  (1, 1), (2, 2), (4, 4)
+)
+#let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)))
 
 // Create the axes for the overlay plot
-#let x_axis = axis(min: 0, max: 4, step: 1, location: "bottom")
-#let y_axis = axis(min: 0, max: 5, step: 1, location: "left", helper_lines: false)
+#let x_axis = axis(min: 0, max: 4, step: 1, location: "bottom", title: "procesorių skaičius")
+#let y_axis = axis(min: 0, max: 5, step: 1, location: "left", helper_lines: false, title: "pagreitėjimas")
 
 // create a plot for each individual plot type and save the render call
-#let pl_scatter = plot(data: data_scatter, axes: (x_axis, y_axis))
-#let scatter_display = scatter_plot(pl_scatter, (50%, 25%), stroke: red)
-#let pl_graph = plot(data: data_graph, axes: (x_axis, y_axis))
-#let graph_display = graph_plot(pl_graph, (50%, 25%), stroke: blue)
+#let pl_core = plot(data: data_core, axes: (x_axis, y_axis))
+#let dp_core = graph_plot(pl_core, (50%, 25%), caption: "pagreitėjimo ir procesorių skaičiaus santykis", stroke: (paint: red, thickness: 1pt, dash: "dashed"))
 
-// overlay the plots using the overlay function
-#overlay((scatter_display, graph_display), (50%, 25%))
+#let pl_all = plot(data: data_all, axes: (x_axis, y_axis))
+#let dp_all = graph_plot(pl_all, (50%, 25%), markings: "circle", stroke: (paint: green, thickness: 1pt, dash: "dashed"))
+
+#let pl_linear = plot(data: data_linear, axes: (x_axis, y_axis))
+#let dp_linear = graph_plot(pl_linear, (50%, 25%), stroke: blue)
+
+#let pl_S_p = plot(data: data_S_p, axes: (x_axis, y_axis))
+#let dp_S_p = graph_plot(pl_S_p, (50%, 25%), stroke: black)
+
+#align(center)[#box()[
+  #overlay((dp_core, dp_linear, dp_all, dp_S_p), (50%, 25%))
+  #place(left, dx: 105%, dy: -87%)[Tiesinis pagreitėjimas]
+  #place(left, dx: 105%, dy: -79%)[Sprendimo paieškos pagreitėjimas]
+  // #place(left, dx: 105%, dy: -39.5%)[#mitex(`$\tilde{S}_p$`)]
+  #place(left, dx: 105%, dy: -64%)[Teorinis pagreitėjimas]
+  #place(left, dx: 105%, dy: -58%)[Programos pagreitėjimas]
+]]
+
+#pagebreak()
+== Antra dalis
+
+Šioje vietoje `for` direktyva atrodo lengvai pritaikoma, kadangi atstumų matricos kiekvieną eilutę galima apskaičiuoti nepriklausomai nuo to ar praeitos eilutės yra apskaičiuotos. Tačiau, pirmos eilutėms reikia žymiau mažiau laiko negu paskutinesnėms, todėl pritaikyta `guided` paskirstymo (angl. _scheduling_) direktyva. Tai leidžia efektyviau paskirstyti ciklų darbą per skirtingas gijas.
+
+#figure(
+  placement: none,
+```c
+distanceMatrix = new double*[numDP];
+#pragma omp parallel
+{
+    #pragma omp for schedule(guided)
+    for (int i=0; i<numDP; i++) {
+        distanceMatrix[i] = new double[i+1];
+        for (int j=0; j<=i; j++) {
+            distanceMatrix[i][j] = HaversineDistance(
+              demandPoints[i][0],
+              demandPoints[i][1],
+              demandPoints[j][0],
+              demandPoints[j][1]
+            );
+        }
+    }
+}
+}
+```,
+  caption: [Paralelizuotas atstumų matricos skaičiavimas]
+) <matrix>
+
+=== Rezultatai
 
 /// MATRIX PARALLELIZATION
 
 // === NUM_THREADS: 1 ===
+
+#let values1 = (17.3815, 17.4154, 17.3834, 16.0638, 17.4336)
+#let core1 = (values1.slice(0, count: 3).sum() / 3)
+
+#let matrix_values1 = (4.53539, 4.54804, 4.54235, 4.59599, 4.54931)
+#let matrix1 = (matrix_values1.slice(0, count: 3).sum() / 3)
+
+#let all_values1 = (21.9169, 21.9635, 21.9257, 20.6598, 21.9829)
+#let all1 = (all_values1.slice(0, count: 3).sum() / 3)
+
 // Matricos skaiciavimo trukme: 4.53539
 // Sprendinio paieskos trukme: 17.3815
 // Algoritmo vykdymo trukme: 21.9169
@@ -274,7 +380,16 @@ double evaluateSolution(int *X) {
 // Algoritmo vykdymo trukme: 21.9829
 
 // === NUM_THREADS: 2 ===
-// 
+
+#let values2 = (8.71614, 9.21011, 9.12135, 8.66471, 8.94833)
+#let core2 = (values2.slice(0, count: 3).sum() / 3)
+
+#let matrix_values2 = (2.17127, 2.29965, 2.3158, 2.29705, 2.00836)
+#let matrix2 = (matrix_values2.slice(0, count: 3).sum() / 3)
+
+#let all_values2 = (10.8874, 11.5098, 11.4371, 10.9618, 10.9567)
+#let all2 = (all_values2.slice(0, count: 3).sum() / 3)
+
 // Matricos skaiciavimo trukme: 2.17127
 // Sprendinio paieskos trukme: 8.71614
 // Algoritmo vykdymo trukme: 10.8874
@@ -295,8 +410,17 @@ double evaluateSolution(int *X) {
 // Sprendinio paieskos trukme: 8.94833
 // Algoritmo vykdymo trukme: 10.9567
 
-// === NUM_THREADS: 2 ===
-//
+// === NUM_THREADS: 4 ===
+
+#let values4 = (4.71473, 4.87095, 4.70493, 4.65552, 4.50287)
+#let core4 = (values4.slice(0, count: 3).sum() / 3)
+
+#let matrix_values4 = (1.08591, 1.04877, 1.03318, 1.05278, 1.06363)
+#let matrix4 = (matrix_values4.slice(0, count: 3).sum() / 3)
+
+#let all_values4 = (5.80063, 5.91972, 5.73811, 5.70831, 5.5665)
+#let all4 = (all_values4.slice(0, count: 3).sum() / 3)
+
 // Matricos skaiciavimo trukme: 1.08591
 // Sprendinio paieskos trukme: 4.71473
 // Algoritmo vykdymo trukme: 5.80063
@@ -316,3 +440,50 @@ double evaluateSolution(int *X) {
 // Matricos skaiciavimo trukme: 1.06363
 // Sprendinio paieskos trukme: 4.50287
 // Algoritmo vykdymo trukme: 5.5665
+
+#let beta = (core1 / all1)
+#let alpha = 1 - beta
+
+// Create the data for the two plots to overlay
+#let data_core = (
+  (1, core1 / core1), (2, core1 / core2), (4, core1 / core4)
+)
+#let data_all = (
+  (1, all1 / all1), (2, all1 / all2), (4, all1 / all4)
+)
+#let data_linear = (
+  (1, 1), (2, 2), (4, 4)
+)
+#let data_matrix = (
+  (1, matrix1 / matrix1), (2, matrix1 / matrix2), (4, matrix1 / matrix4)
+)
+
+#let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)))
+
+// Create the axes for the overlay plot
+#let x_axis = axis(min: 0, max: 4, step: 1, location: "bottom", title: "procesorių skaičius")
+#let y_axis = axis(min: 0, max: 5, step: 1, location: "left", helper_lines: false, title: "pagreitėjimas")
+
+// create a plot for each individual plot type and save the render call
+#let pl_core = plot(data: data_core, axes: (x_axis, y_axis))
+#let dp_core = graph_plot(pl_core, (50%, 25%), caption: "pagreitėjimo ir procesorių skaičiaus santykis", stroke: (paint: red, thickness: 1pt, dash: "dashed"))
+
+#let pl_all = plot(data: data_all, axes: (x_axis, y_axis))
+#let dp_all = graph_plot(pl_all, (50%, 25%), markings: "circle", stroke: (paint: green, thickness: 1pt, dash: "dashed"))
+
+#let pl_linear = plot(data: data_linear, axes: (x_axis, y_axis))
+#let dp_linear = graph_plot(pl_linear, (50%, 25%), stroke: blue)
+
+#let pl_matrix = plot(data: data_matrix, axes: (x_axis, y_axis))
+#let dp_matrix = graph_plot(pl_matrix, (50%, 25%), stroke: (paint: purple, thickness: 1pt, dash: "dashed"))
+
+// #let pl_S_p = plot(data: data_S_p, axes: (x_axis, y_axis))
+// #let dp_S_p = graph_plot(pl_S_p, (50%, 25%), stroke: black)
+
+#align(center)[#box()[
+  #overlay((dp_core, dp_linear, dp_all, dp_matrix), (50%, 25%))
+  #place(left, dx: 100%, dy: -88%)[Tiesinis pagreitėjimas] // dp_linear
+  #place(left, dx: 100%, dy: -76%)[Sprendimo paieškos pagreitėjimas] // do_core
+  #place(left, dx: 100%, dy: -83%)[Programos pagreitėjimas] // dp_all
+  #place(left, dx: 100%, dy: -94%)[Matricos skaičiavimo pagreitėjimas] // dp_matrix
+]]

@@ -10,10 +10,10 @@ using namespace std;
 
 //===== Globalus kintamieji ===================================================
 
-int numDP = 5000;               // Vietoviu skaicius (demand points, max 10000)
-int numPF = 5;                  // Esanciu objektu skaicius (preexisting facilities)
-int numCL = 50;                 // Kandidatu naujiems objektams skaicius (candidate locations)
-int numX  = 3;                  // Nauju objektu skaicius
+const int numDP = 5000;               // Vietoviu skaicius (demand points, max 10000)
+const int numPF = 5;                  // Esanciu objektu skaicius (preexisting facilities)
+const int numCL = 50;                 // Kandidatu naujiems objektams skaicius (candidate locations)
+const int numX  = 3;                  // Nauju objektu skaicius
 
 double **demandPoints;          // Geografiniai duomenys
 double **distanceMatrix;   	    // Masyvas atstumu matricai saugoti
@@ -33,7 +33,7 @@ int increaseX(int* X, int index, int maxindex);
 
 //=============================================================================
 void display_results(char *filename);
-const int NUM_THREADS = 1;
+const int NUM_THREADS = 4;
 
 int main() {
     omp_set_num_threads(NUM_THREADS);
@@ -68,11 +68,30 @@ int main() {
     // cout << "Pradines naujo ir geriausio sprendiniu reiksmes skaiciavimo trukme: " << t_first_cycle - t_matrix << endl;
 
     //----- Visų galimų sprendinių perrinkimas --------------------------------
-    while (increaseX(X, numX-1, numCL) == true) {
-        u = evaluateSolution(X);
-        if (u > bestU) {
-            bestU = u;
-            for (int i=0; i<numX; i++) bestX[i] = X[i];
+    bool increased = true;
+    int *manyXs = new int[NUM_THREADS * numX];
+
+    #pragma omp parallel private(u)
+    {
+        while (increased) {
+            int thread_id = omp_get_thread_num();
+            int *localX = manyXs + (thread_id * numX);
+            
+            #pragma omp critical(increaseX)
+            {
+                increased = increaseX(X, numX-1, numCL);
+                memcpy(localX, X, sizeof(int) * numX);
+            }
+            
+            u = evaluateSolution(localX);
+
+            #pragma omp critical(best)
+            {
+                if (u > bestU) {
+                    bestU = u;
+                    memcpy(bestX, localX, sizeof(int) * numX);
+                }
+            }
         }
     }
 
@@ -133,8 +152,6 @@ double evaluateSolution(int *X) {
     int bestX;
     double d;
 
-    #pragma omp parallel reduction (+:U, totalU) private(bestPF, bestX, d)
-    #pragma omp for
     for (int i=0; i<numDP; i++) {
         totalU += demandPoints[i][2];
         bestPF = 1e5;
