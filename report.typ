@@ -1,7 +1,4 @@
 #import "@preview/mitex:0.2.4": *
-// #import "@preview/plotst:0.2.0": *
-// #import "@preview/oxifmt:0.2.0": strfmt
-// #import "@preview/cetz:0.3.1"
 #import "@preview/cetz:0.3.1": canvas, draw
 #import "@preview/cetz-plot:0.1.0": plot, chart
 #import "@preview/codly:1.0.0"
@@ -54,7 +51,7 @@
 
 == Pirma dalis
 
-=== Paralelizavimo galimybių analizė
+=== Lygiagretinimo galimybių analizė
 
 Pirmasis skaičiavimo skaičiavimo ciklas (@first_cycle) palyginus užtrunka nedaug laiko (apie ~0.002 sekundės). Praktiniems tikslams, jį galima ignoruoti.
 
@@ -91,11 +88,11 @@ while (increaseX(X, numX-1, numCL) == true) {
 
   - `increaseX` - keičia masyvo `X` reikšmę (@increseX), ir ne tik `index`-ąjį elementą, rekursyviai kviesdamas save sumažina `index` reikšmę vienu, t.y. iškvietus `increaseX` visos masyvos reikšmės yra keičiamos. To pasekmė, kad `index`-ojo elemento skaičiavimo negalima paskirstyti skirtingoms gijoms, kitaip vėlesnėms gijoms reikėtų laukti, kol praeita gija baigs savo darbą, visiškai nustelbiant parelelizavimo naudą.
 
-  - `increaseX` skaičiavimai priklauso vienas nuo kito, t.y. norint apskaičiuoti `X` reikšmę $n$-ame ciklo vykdyme, reikia pirma apskaičiuoti `X` reikšmę $(n-1)$-ame ciklo vykdyme. Analogiškai negalima paralelizuoti nes kitos gijos lauktų, kol praeita gija baigs savo darbą.
+  - `increaseX` skaičiavimai priklauso vienas nuo kito, t.y. norint apskaičiuoti `X` reikšmę $n$-ame ciklo vykdyme, reikia pirma apskaičiuoti `X` reikšmę $(n-1)$-ame ciklo vykdyme. Analogiškai negalima lygiagretinti nes kitos gijos lauktų, kol praeita gija baigs savo darbą.
 
   - `if (u > bestU) { ... }` irgi gali tik vienas ciklas vienu metu, nes `bestU` ir `X` pakeitimas turi būti atliekamas "žingsniu" - t.y. atomiškai.
 
-Iš esmės neperrašius `increaseX`, šios funkcijos ir jos kvietimo cikle, yra nepraktiška parelilizuoti.
+Iš esmės neperrašius `increaseX`, `X` skaičiavimų lygiagretinti nėra praktiška.
 
 #figure(
   placement: none,
@@ -152,7 +149,7 @@ double evaluateSolution(int *X) {
 ) <evaluateSolution>
 
 
-=== Sprendimo paralelizavimas
+=== Sprendimo lygiagretinimas
 
 Dėl anksčiau išvardintų priežąsčių `increaseX` apskaičiavimas išskiriamas į `critical` bloką, tam, kad tik viena gija galėtų modifikuoti `X` reikšmę vienu metu. Apskaičiavus ir atnaujinus `X`, kiekviena gija susikuria savo `X` kopiją - `localX`. Šią kopiją galima naudoti `evaluateSolution` nes jinai ne bus keičiama. Kiekviena gija taip pat gauna `u` kopiją į kurią įrašo `evaluateSolution` apskaičiuotą reikšmę. Ciklo gale vėl naudojamas `critical`, tam kad tik viena gija vienu metu galėtų įvertinti `u > bestU` ir pakeisti `bestU` ir `bestX` reikšmes.
 
@@ -186,7 +183,7 @@ int *manyXs = new int[NUM_THREADS * numX];
     }
 }
 ```,
-  caption: [Paralelizuotas visų galimų sprendinių perrinkimas]
+  caption: [Sulygiagretintas visų galimų sprendinių perrinkimas]
 )
 
 === Rezultatai
@@ -239,6 +236,11 @@ int *manyXs = new int[NUM_THREADS * numX];
 #let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)))
 
 #align(center)[
+]
+
+#figure(
+  placement: none,
+[
   #canvas({
     import draw: *
 
@@ -287,7 +289,13 @@ int *manyXs = new int[NUM_THREADS * numX];
         )
       })
   })
-]
+
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas nuoseklus]
+) <fig1>
+
+Iš @fig1 matoma, kad lygiagretinamos dalies pagreitėjimas seka tiesinį pagreitėjimą. O visos programos pagreitėmijas seka teorinį pagreitėjimą nusakytą pagal Amdalo dėsnį.
 
 == Antra dalis
 
@@ -313,7 +321,7 @@ distanceMatrix = new double*[numDP];
     }
 }
 ```,
-  caption: [Paralelizuotas atstumų matricos skaičiavimas]
+  caption: [Sulygiagretintas atstumų matricos skaičiavimas]
 ) <matrix>
 
 === Rezultatai
@@ -345,6 +353,9 @@ distanceMatrix = new double*[numDP];
 
 
 #align(center)[
+#figure(
+  placement: none,
+[
   #canvas({
     import draw: *
 
@@ -391,4 +402,11 @@ distanceMatrix = new double*[numDP];
         )
       })
   })
-]
+  
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas]
+) <fig2>
+] 
+
+Iš @fig2 matoma, kad matricos skaičiavimo ir sprendimo ieškojimo pagreitėjimas seka tiesinę kreivę, kas matosi ir visos programos pagreitėjime, kuri irgi seka tiesinę kreivę.
