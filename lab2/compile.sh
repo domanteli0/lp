@@ -1,1 +1,1 @@
-mpic++ -W -Wall -Wextra flpenum.cpp -o flpenum
+mpicc -W -Wall -Wextra flpenum.c -lm -o flpenum
