@@ -32,8 +32,14 @@ int increaseX(int *X, int index, int maxindex);
 
 //=============================================================================
 
+#define SIGNAL_DONE 10
+#define DATA_X 1
+#define DATA_U 2
+#define DATA_BEST_U 3
+
 void display_results(char *filename, int *bestX);
 void write_times(double t_start, double t_matrix, double t_finish);
+void broadcast_done();
 
 int world_size;
 
@@ -42,11 +48,9 @@ struct UX {
    int *X;
 } ux;
 
+
 int main(int argc, char **argv) {
    MPI_Init(&argc, &argv);
-
-   int X[numX];        // Naujas sprendinys
-   int bestX[numX];    // Geriausias rastas sprendinys
 
    // Get the number of processes
    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -55,8 +59,22 @@ int main(int argc, char **argv) {
    int world_rank;
    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
+   // MPI_Comm comm;
+   // if (world_rank == 0) {
+   //    MPI_Comm_split(MPI_COMM_WORLD, MPI_UNDEFINED, world_rank, &comm);
+   // } else {
+   //    int color = 1;
+   //    MPI_Comm_split(MPI_COMM_WORLD, color, world_rank, &comm);
+   // }
+
    loadDemandPoints();			// Duomenu nuskaitymas is failo
    double t_start = getTime(); // Algoritmo vykdymo pradzios laikas
+
+   void *buffer;
+   // int buffer_size = 1024 * 1024 * 1024 /*GiB*/ */; // malloc(sizeof(int) * world_size);
+   int buffer_size = 1024 * 1024 /*MiB*/; // malloc(sizeof(int) * world_size);
+   buffer = malloc(buffer_size);
+   MPI_Buffer_attach(buffer, buffer_size);
 
    //----- Atstumu matricos skaiciavimas -------------------------------------
    distanceMatrix = calloc(sizeof(double *), numDP);
@@ -67,58 +85,86 @@ int main(int argc, char **argv) {
       }
    }
 
-   printf("BARRIER REACHED FROM %i\n", world_rank);
+   printf("BARRIER A REACHED FROM %i\n", world_rank);
    MPI_Barrier(MPI_COMM_WORLD);
 
    double t_matrix = getTime();
    printf("Matricos skaiciavimo trukme: %lf\n", t_matrix - t_start);
 
    //----- Pradines naujo ir geriausio sprendiniu reiksmes -------------------
-   for (int i = 0; i < numX; i++) { // Pradines naujo ir geriausio sprendiniu koordinates: [0,1,2,...]
-      X[i] = i;
-      bestX[i] = i;
-   }
+   // for (int i = 0; i < numX; i++) { // Pradines naujo ir geriausio sprendiniu koordinates: [0,1,2,...]
+   //    X[i] = i;
+   //    bestX[i] = i;
+   // }
+   int *X = calloc(sizeof(int), numX);        // Naujas sprendinys
+   int *bestX = calloc(sizeof(int), numX);    // Geriausias rastas sprendinys
+
    u = evaluateSolution(X); // Naujo sprendinio naudingumas (utility)
-   bestU = u;				 // Geriausio sprendinio sprendinio naudingumas
+   bestU = u;               // Geriausio sprendinio sprendinio naudingumas
 
    //----- Visų galimų sprendinių perrinkimas --------------------------------
    bool increased = true;
    while (increased) {
-      // TODO: calculate as many X values as there are processes (`world_size`).
+      int sends = 1;
       if (world_rank == 0) {
-         // for(int ix = 1; ix < world_size; ++ix) {
+         printf("MAIN: about to send(X)\n");
+         for(int ix = 1; ix < world_size; ++ix) {
             increased = increaseX(X, numX - 1, numCL);
 
+            // MPI_Request x_req;
+            // IDEA: MPI_Scatter(..., 0, comm);
+            MPI_Send(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
+            sends = ix + 1;
+
             if (!increased) {
-               // TODO: send the last X values
-               // MPI_Bcast(...); // broadcast `DONE` to all other processes
+               // MPI_Request done_req;
+               // TODO: this could be acheived with MPI_Bcast
+               for (int ix = 1; ix < world_size; ++ix) {
+                  printf("SENT DONE\n");
+                  MPI_Bsend(X, 0, MPI_BYTE, ix, SIGNAL_DONE, MPI_COMM_WORLD);
+               }
+               break;
             }
-         // }
-
-         // TODO: send the all X value
+         }
+         printf("MAIN: send(X)\n");
       }
-      // TODO: send X values to other processes and self
-      // MPI_Scatter(..., 0, comm);
 
-      // TODO: receive the individual X value;
-      // MPI_Receive(...);
+      if (world_rank != 0) {
+         MPI_Status status;
+         MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-      // if (message_type == DONE) { break; }
+         if (status.MPI_TAG == SIGNAL_DONE) {
+             // Receive and handle the DONE signal, then break the loop
+             MPI_Recv(NULL, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+             printf("WORKER %d: received DONE signal\n", world_rank);
+             break;
+         }
 
-      u = evaluateSolution(X);
-      // TODO: send u to master (world_rank == 0) process
+         printf("WORKER %i: waiting for recv(X)\n", world_rank);
+         MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         printf("WORKER %i: recv(X)\n", world_rank);
+
+         u = evaluateSolution(X);
+
+         MPI_Send(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+         MPI_Send(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+         printf("WORKER %i: send(X)\n", world_rank);
+      }
 
       if (world_rank == 0) {
-         // TODO receive asynchronously `u` and `X` from each process
+         for (int ix = 1; ix < sends; ++ix) {
 
-         if (u > bestU) {
-            bestU = u;
-            memcpy(bestX, X, sizeof(int) * numX);
+            MPI_Recv(&u, 1, MPI_DOUBLE, ix, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            if (u > bestU) {
+               bestU = u;
+               memcpy(bestX, X, sizeof(int) * numX);
+            }
          }
+         printf("MAIN: recv(X)\n");
       }
    }
-
-   MPI_Barrier(MPI_COMM_WORLD);
 
    //----- Rezultatu spausdinimas --------------------------------------------
    if (world_rank == 0) {
@@ -128,7 +174,7 @@ int main(int argc, char **argv) {
 
       display_results("stdout" , bestX);
       display_results("new.dat", bestX);
-      // write_times(t_start, t_matrix, t_finish);
+      write_times(t_start, t_matrix, t_finish);
    }
 
    MPI_Finalize();
@@ -141,8 +187,7 @@ void loadDemandPoints()
    FILE *f;
    f = fopen("demandPoints.dat", "r");
    demandPoints = calloc(sizeof(double *), numDP);
-   for (int i = 0; i < numDP; i++)
-   {
+   for (int i = 0; i < numDP; i++) {
       demandPoints[i] = calloc(sizeof(double), 3);
       fscanf(f, "%lf%lf%lf", &demandPoints[i][0], &demandPoints[i][1], &demandPoints[i][2]);
    }
@@ -251,7 +296,7 @@ void display_results(char *filename, int *bestX) {
 
 void write_times(double t_start, double t_matrix, double t_finish) {
    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
-   sprintf(filename_buffer, "no_matrix_%i.tsv", world_size);
+   sprintf(filename_buffer, "results/first_%i.tsv", world_size);
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;
@@ -261,4 +306,8 @@ void write_times(double t_start, double t_matrix, double t_finish) {
          t_matrix - t_start,
          t_finish - t_matrix,
          t_finish - t_start);
+}
+
+void broadcast_done() {
+
 }
