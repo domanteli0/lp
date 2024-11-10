@@ -2,6 +2,7 @@
 #import "@preview/cetz:0.3.1": canvas, draw
 #import "@preview/cetz-plot:0.1.0": plot, chart
 #import "@preview/codly:1.0.0"
+#import "typst/data.typ": *
 
 #show: codly.codly-init.with()
 
@@ -199,25 +200,14 @@ int *manyXs = new int[NUM_THREADS * numX];
 //   ..results.flatten(),
 // )
 
-#let read_data(file: "", column: 1) = {
-  let results = csv(file, delimiter: "\t")
+#let core1 = read_data(file: "../lab1/no_matrix_1.tsv", column: 2)
+#let all1 = read_data(file: "../lab1/no_matrix_1.tsv", column: 3)
 
-  let values = results
-    .map(r => float(r.at(column)))
-    .slice(0, count: 3)
-    .sum()
-  
-  values / 3
-}
+#let core2 = read_data(file: "../lab1/no_matrix_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab1/no_matrix_2.tsv", column: 3)
 
-#let core1 = read_data(file: "lab1/no_matrix_1.tsv", column: 2)
-#let all1 = read_data(file: "lab1/no_matrix_1.tsv", column: 3)
-
-#let core2 = read_data(file: "lab1/no_matrix_2.tsv", column: 2)
-#let all2 = read_data(file: "lab1/no_matrix_2.tsv", column: 3)
-
-#let core4 = read_data(file: "lab1/no_matrix_4.tsv", column: 2)
-#let all4 = read_data(file: "lab1/no_matrix_4.tsv", column: 3)
+#let core4 = read_data(file: "../lab1/no_matrix_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab1/no_matrix_4.tsv", column: 3)
 
 
 #let beta = (core1 / all1)
@@ -234,9 +224,6 @@ int *manyXs = new int[NUM_THREADS * numX];
   (1, 1), (2, 2), (4, 4)
 )
 #let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)), (8, 1/(alpha + beta/8)))
-
-#align(center)[
-]
 
 #figure(
   placement: none,
@@ -326,17 +313,17 @@ distanceMatrix = new double*[numDP];
 
 === Rezultatai
 
-#let core1 = read_data(file: "lab1/with_matrix_1.tsv", column: 2)
-#let all1 = read_data(file: "lab1/with_matrix_1.tsv", column: 3)
-#let matrix1 = read_data(file: "lab1/with_matrix_1.tsv", column: 1)
+#let core1 = read_data(file: "../lab1/with_matrix_1.tsv", column: 2)
+#let all1 = read_data(file: "../lab1/with_matrix_1.tsv", column: 3)
+#let matrix1 = read_data(file: "../lab1/with_matrix_1.tsv", column: 1)
 
-#let core2 = read_data(file: "lab1/with_matrix_2.tsv", column: 2)
-#let all2 = read_data(file: "lab1/with_matrix_2.tsv", column: 3)
-#let matrix2 = read_data(file: "lab1/with_matrix_2.tsv", column: 1)
+#let core2 = read_data(file: "../lab1/with_matrix_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab1/with_matrix_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab1/with_matrix_2.tsv", column: 1)
 
-#let core4 = read_data(file: "lab1/with_matrix_4.tsv", column: 2)
-#let all4 = read_data(file: "lab1/with_matrix_4.tsv", column: 3)
-#let matrix4 = read_data(file: "lab1/with_matrix_4.tsv", column: 1)
+#let core4 = read_data(file: "../lab1/with_matrix_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab1/with_matrix_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab1/with_matrix_4.tsv", column: 1)
 
 #let data_core = (
   (1, core1 / core1), (2, core1 / core2), (4, core1 / core4)
@@ -414,21 +401,22 @@ Iš @fig2 matoma, kad matricos skaičiavimo ir sprendimo ieškojimo pagreitėjim
 #pagebreak()
 == Antra dalis
 
-#let core2 = read_data(file: "lab2/results/first_2.tsv", column: 2)
-#let all2 = read_data(file: "lab2/results/first_2.tsv", column: 3)
-#let matrix2 = read_data(file: "lab2/results/first_2.tsv", column: 1)
+#let core2 = read_data(file: "../lab2/results/first_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab2/results/first_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab2/results/first_2.tsv", column: 1)
 
-#let core4 = read_data(file: "lab2/results/first_4.tsv", column: 2)
-#let all4 = read_data(file: "lab2/results/first_4.tsv", column: 3)
-#let matrix4 = read_data(file: "lab2/results/first_4.tsv", column: 1)
+#let core4 = read_data(file: "../lab2/results/first_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab2/results/first_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab2/results/first_4.tsv", column: 1)
 
-#let core8 = read_data(file: "lab2/results/first_8.tsv", column: 2)
-#let all8 = read_data(file: "lab2/results/first_8.tsv", column: 3)
-#let matrix8 = read_data(file: "lab2/results/first_8.tsv", column: 1)
+#let core8 = read_data(file: "../lab2/results/first_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab2/results/first_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab2/results/first_8.tsv", column: 1)
 
 #let data_core = (
-  (1, 1), (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+  (1, 1), (2, core1 / core2), (4, core1 / core4), (8, all1 / core8)
 )
+
 #let data_all = (
   (1, 1), (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
 )
@@ -499,8 +487,8 @@ Iš @fig2 matoma, kad matricos skaičiavimo ir sprendimo ieškojimo pagreitėjim
   })
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas]
-) <fig_first_attemp>
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis (`first_attempt`)]
+) <fig_first_attemp_1>
 ] 
 
 
@@ -572,5 +560,89 @@ Iš @fig2 matoma, kad matricos skaičiavimo ir sprendimo ieškojimo pagreitėjim
 
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas nuoseklus]
-) <fig_>
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis (`first_attempt`)]
+) <fig_first_attemp_2>
+
+
+#let core3 = read_data(file: "../lab2/results/first_3.tsv", column: 2)
+#let all3 = read_data(file: "../lab2/results/first_3.tsv", column: 3)
+#let matrix3 = read_data(file: "../lab2/results/first_3.tsv", column: 1)
+
+#let core5 = read_data(file: "../lab2/results/first_5.tsv", column: 2)
+#let all5 = read_data(file: "../lab2/results/first_5.tsv", column: 3)
+#let matrix5 = read_data(file: "../lab2/results/first_5.tsv", column: 1)
+
+#let core9 = read_data(file: "../lab2/results/first_9.tsv", column: 2)
+#let all9 = read_data(file: "../lab2/results/first_9.tsv", column: 3)
+#let matrix9 = read_data(file: "../lab2/results/first_9.tsv", column: 1)
+
+#let data_core = (
+  (1, 1), (2, core1 / core3), (4, core1 / core5), (8, all1 / core8)
+)
+
+#let data_all = (
+  (1, 1), (2, all1 / all3), (4, all1 / all5), (8, all1 / all9)
+)
+#let data_linear = (
+  (1, 1), (2, 2), (4, 4), (8, 8)
+)
+#let data_matrix = (
+  (1, 1), (2, matrix1 / matrix3), (4, matrix1 / matrix5), (8, matrix1 / matrix9)
+)
+
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    // Set-up a thin axis style
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%),
+    )
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (10, 6),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      // legend: auto,
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: "Sprendimo paieškos pagreitėjimas"
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: "Programos pagreitėjimas"
+        )
+
+        plot.add(
+          data_linear,
+          style: (stroke: (paint: blue)), 
+          label: "Tiesinis pagreitėjimas"
+        )
+
+        plot.add(
+          data_S_p,
+          style: (stroke: (paint: rgb("#ff8104"))), 
+          label: "Teorinis pagreitėjimas"
+        )
+      })
+  })
+
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis (`first_attempt`), neskaičiuojant _main_ proceso]
+) <fig_first_attemp_2>

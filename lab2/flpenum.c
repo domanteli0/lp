@@ -32,6 +32,10 @@ int increaseX(int *X, int index, int maxindex);
 
 //=============================================================================
 
+void printf_(char *_, ...) { }
+
+#define printf printf_
+
 #define SIGNAL_DONE 10
 #define DATA_X 1
 #define DATA_U 2
