@@ -38,6 +38,9 @@ void write_times(double t_start, double t_matrix, double t_finish);
 void display_results(char *filename, int *bestX);
 void printX(int *X);
 
+void printf_(char *_, ...) { }
+#define printf printf_
+
 int main() {
 	loadDemandPoints();             // Duomenu nuskaitymas is failo	
     double t_start = getTime();     // Algoritmo vykdymo pradzios laikas
@@ -96,7 +99,7 @@ int main() {
 
 	display_results("new.dat", bestX);
 
-    // write_times(t_start, t_matrix, t_finish);
+    write_times(t_start, t_matrix, t_finish);
 }
 
 //===== Funkciju implementacijos (siu funkciju LYGIAGRETINTI NEREIKIA) ========
