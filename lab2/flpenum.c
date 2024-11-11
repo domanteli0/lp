@@ -80,9 +80,8 @@ int main(int argc, char **argv) {
    double t_start = getTime(); // Algoritmo vykdymo pradzios laikas
 
    void *buffer;
-   // int buffer_size = 1024 * 1024 * 1024 /*GiB*/ */; // malloc(sizeof(int) * world_size);
-   // int buffer_size = 1024 * 1024 /*1 MiB*/; // malloc(sizeof(int) * world_size);
-   int buffer_size = (2*world_size) * (sizeof(int) * numX * MPI_BSEND_OVERHEAD);
+   // int buffer_size = (2*world_size) * (sizeof(int) * numX * MPI_BSEND_OVERHEAD);
+   int buffer_size = 1024 * (2*world_size) * (sizeof(int) * numX * MPI_BSEND_OVERHEAD);
    buffer = malloc(buffer_size);
    MPI_Buffer_attach(buffer, buffer_size);
 
@@ -125,24 +124,21 @@ int main(int argc, char **argv) {
       // if (counter > 10 + 1) { break; }
 
       if (world_rank == 0 && increased) {
-         printf("MAIN| about to send(X)\n");
+         // printf("MAIN| about to send(X)\n");
          for(int ix = 1; ix < world_size; ++ix) {
             increased = increaseX(X, numX - 1, numCL);
-            printf("MAIN| X: "); printX(X);
+            // printf("MAIN| X: "); printX(X);
 
             // MPI_Request x_req;
             // IDEA: MPI_Scatter(..., 0, comm);
-            MPI_Send(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
+            MPI_Bsend(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
             printf("MAIN| send(X)\n");
 
             if (!increased) {
                // MPI_Request done_req;
                // TODO: this could be acheived with MPI_Bcast
                for (int ix = 1; ix < world_size; ++ix) {
-                  // printf("MAIN| SENT DONE to %i\n", ix);
-                  char *str = calloc(sizeof(char), 128);
-                  sprintf(str, "MAIN| SENT DONE to %i\n", ix);
-                  puts(str);
+                  printf("MAIN| SENT DONE to %i\n", ix);
 
                   MPI_Send(X, 0, MPI_BYTE, ix, SIGNAL_DONE, MPI_COMM_WORLD);
                }
@@ -159,37 +155,48 @@ int main(int argc, char **argv) {
             bestU = u;
             memcpy(bestX, X, sizeof(int) * numX);
          }
+
+         if (!increased) {
+            // MPI_Request done_req;
+            // TODO: this could be acheived with MPI_Bcast
+            for (int ix = 1; ix < world_size; ++ix) {
+               printf("MAIN| SENT DONE to %i\n", ix);
+
+               MPI_Send(X, 0, MPI_BYTE, ix, SIGNAL_DONE, MPI_COMM_WORLD);
+            }
+            break;
+         }
       }
 
       if (world_rank != 0) {
-         // sprintf(str, "WORKER %i| to check doneness", world_rank);
-         // puts(str);
+         // printf("WORKER %i| workering\n", world_rank);
+         // usleep(20);
          bool master_done = WRP_Check_for(0, SIGNAL_DONE, MPI_COMM_WORLD);
+         // printf("WORKER %i| checked doneness\n", world_rank);
          // bool master_more_x = WRP_Check_for(0, DATA_X, MPI_COMM_WORLD);
          // if (master_done && NOT(master_more_x)) {
          if (master_done) {
-            char *str = calloc(sizeof(char), 128);
-            sprintf(str, "WORKER %i| ready to be done", world_rank);
-            puts(str);
-            
-            MPI_Recv(&copy_u, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Send(X, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD);
-            // printf("WORKER %i| received DONE signal from MAIN\n", world_rank);
-            sprintf(str, "WORKER %i| received DONE signal from MAIN\n", world_rank);
-            puts(str);
+            printf("WORKER %i| about ot receive DONE\n", world_rank);
+            MPI_Recv(NULL, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Send(NULL, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD);
+            printf("WORKER %i| received DONE signal\n", world_rank);
             break;
          }
 
-         MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-         printf("WORKER %i| x: ", world_rank); printX(X);
+         bool master_sent_X = WRP_Check_for(0, DATA_X, MPI_COMM_WORLD);
+         if (master_sent_X) {
+            MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            printf("WORKER %i| received X\n", world_rank);
+            // printf("WORKER %i| x: ", world_rank); printX(X);
 
-         u = evaluateSolution(X);
+            u = evaluateSolution(X);
 
-         printf("WORKER %i| u: %lf\n", world_rank, u);
+            // printf("WORKER %i| u: %lf\n", world_rank, u);
 
-         MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
-         MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
-         printf("WORKER %i| send(X)\n", world_rank);
+            MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+            MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+            printf("WORKER %i| send(X)\n", world_rank);
+         }
       }
 
       if (world_rank == 0) {
@@ -200,20 +207,19 @@ int main(int argc, char **argv) {
             MPI_Recv(&copy_u, 0, MPI_BYTE, worker_check.status.MPI_SOURCE, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             dones[worker_check.status.MPI_SOURCE] = UCHAR_MAX;
             num_dones += 1;
-            if (num_dones > 10) { abort(); }
-            printf("MAIN| num_dones: %u\n", num_dones);
+            // printf("MAIN| num_dones: %u\n", num_dones);
          }
 
          bool done = true;
          for (int ix = 1; ix < world_size; ++ix) { done = done && (dones[ix] == UCHAR_MAX); }
          if (done) { break; }
 
-         for (int ix = 0; ix < world_size + 2; ++ix) {
-            WRP_Check worked_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
-            if (worked_sent_X.flag) {
-               MPI_Recv(&copy_u, 1, MPI_DOUBLE, worked_sent_X.status.MPI_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-               MPI_Recv(copy_X, numX, MPI_INT, worked_sent_X.status.MPI_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-               printf("MAIN: recv(X)\n");
+         WRP_Check worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
+         while(worker_sent_X.flag) {
+            if (worker_sent_X.flag) {
+               MPI_Recv(&copy_u, 1, MPI_DOUBLE, worker_sent_X.status.MPI_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+               MPI_Recv(copy_X, numX, MPI_INT, worker_sent_X.status.MPI_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+               // printf("MAIN: recv(X)\n");
                // fprint_X(fp, copy_u, copy_X);
 
                if (copy_u > bestU) {
@@ -221,15 +227,17 @@ int main(int argc, char **argv) {
                   memcpy(bestX, copy_X, sizeof(int) * numX);
                }
             }
+
+            worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
          }
       }
 
-      // if(world_rank > 0) {
-      //    char *str = calloc(sizeof(char), 128);
-      //    sprintf(str, "WORKER %i| stuck", world_rank);
-      //    puts(str);
+      // if(world_rank > 0 && (getTime() - t_matrix) > 1.0) {
+      //    printf("WORKER %i| stuck\n", world_rank);
       // }
    }
+   
+   printf("PROCESS %i| done\n", world_rank);
 
    //----- Rezultatu spausdinimas --------------------------------------------
    if (world_rank == 0) {
@@ -240,7 +248,7 @@ int main(int argc, char **argv) {
 
       display_results("stdout" , bestX, bestU);
       display_results("new.dat", bestX, bestU);
-      // write_times(t_start, t_matrix, t_finish);
+      write_times(t_start, t_matrix, t_finish);
    }
 
    MPI_Finalize();

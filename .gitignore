@@ -1,7 +1,9 @@
 *
+*/.nfs00000000002ce4c80000000a
 !*.*
 !.vscode
 !justfile
 !lab1
 !lab2
 !mini
+!*.tsv
