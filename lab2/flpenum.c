@@ -33,7 +33,6 @@ int increaseX(int *X, int index, int maxindex);
 //=============================================================================
 
 void printf_(char *_, ...) { }
-
 #define printf printf_
 
 #define SIGNAL_DONE 10
@@ -43,7 +42,6 @@ void printf_(char *_, ...) { }
 
 void display_results(char *filename, int *bestX);
 void write_times(double t_start, double t_matrix, double t_finish);
-void broadcast_done();
 
 int world_size;
 
@@ -76,7 +74,8 @@ int main(int argc, char **argv) {
 
    void *buffer;
    // int buffer_size = 1024 * 1024 * 1024 /*GiB*/ */; // malloc(sizeof(int) * world_size);
-   int buffer_size = 1024 * 1024 /*MiB*/; // malloc(sizeof(int) * world_size);
+   // int buffer_size = 1024 * 1024 /*1 MiB*/; // malloc(sizeof(int) * world_size);
+   int buffer_size = (2*world_size) * (sizeof(int) * numX * MPI_BSEND_OVERHEAD);
    buffer = malloc(buffer_size);
    MPI_Buffer_attach(buffer, buffer_size);
 
@@ -96,10 +95,6 @@ int main(int argc, char **argv) {
    printf("Matricos skaiciavimo trukme: %lf\n", t_matrix - t_start);
 
    //----- Pradines naujo ir geriausio sprendiniu reiksmes -------------------
-   // for (int i = 0; i < numX; i++) { // Pradines naujo ir geriausio sprendiniu koordinates: [0,1,2,...]
-   //    X[i] = i;
-   //    bestX[i] = i;
-   // }
    int *X = calloc(sizeof(int), numX);        // Naujas sprendinys
    int *bestX = calloc(sizeof(int), numX);    // Geriausias rastas sprendinys
 
@@ -108,16 +103,16 @@ int main(int argc, char **argv) {
 
    //----- Visų galimų sprendinių perrinkimas --------------------------------
    bool increased = true;
-   while (increased) {
+   while (true) {
       int sends = 1;
-      if (world_rank == 0) {
+      if (world_rank == 0 && increased) {
          printf("MAIN: about to send(X)\n");
          for(int ix = 1; ix < world_size; ++ix) {
             increased = increaseX(X, numX - 1, numCL);
 
             // MPI_Request x_req;
             // IDEA: MPI_Scatter(..., 0, comm);
-            MPI_Send(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
+            MPI_Bsend(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
             sends = ix + 1;
 
             if (!increased) {
@@ -125,7 +120,7 @@ int main(int argc, char **argv) {
                // TODO: this could be acheived with MPI_Bcast
                for (int ix = 1; ix < world_size; ++ix) {
                   printf("SENT DONE\n");
-                  MPI_Bsend(X, 0, MPI_BYTE, ix, SIGNAL_DONE, MPI_COMM_WORLD);
+                  MPI_Send(X, 0, MPI_BYTE, ix, SIGNAL_DONE, MPI_COMM_WORLD);
                }
                break;
             }
@@ -138,10 +133,10 @@ int main(int argc, char **argv) {
          MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
          if (status.MPI_TAG == SIGNAL_DONE) {
-             // Receive and handle the DONE signal, then break the loop
-             MPI_Recv(NULL, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-             printf("WORKER %d: received DONE signal\n", world_rank);
-             break;
+            // Receive and handle the DONE signal, then break the loop
+            printf("WORKER %d: received DONE signal\n", world_rank);
+            // MPI_Send(X, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD);
+            break;
          }
 
          printf("WORKER %i: waiting for recv(X)\n", world_rank);
@@ -168,6 +163,8 @@ int main(int argc, char **argv) {
          }
          printf("MAIN: recv(X)\n");
       }
+
+      if (!increased) { break; }
    }
 
    //----- Rezultatu spausdinimas --------------------------------------------
@@ -300,7 +297,7 @@ void display_results(char *filename, int *bestX) {
 
 void write_times(double t_start, double t_matrix, double t_finish) {
    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
-   sprintf(filename_buffer, "results/first_%i.tsv", world_size);
+   sprintf(filename_buffer, "results/2_%i.tsv", world_size);
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;
@@ -310,8 +307,4 @@ void write_times(double t_start, double t_matrix, double t_finish) {
          t_matrix - t_start,
          t_finish - t_matrix,
          t_finish - t_start);
-}
-
-void broadcast_done() {
-
 }
