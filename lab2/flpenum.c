@@ -9,6 +9,7 @@
 #include <limits.h>
 #include "wrappers.h"
 #include "shared.h"
+#include "matrix.h"
 
 //===== Globalus kintamieji ===================================================
 
@@ -18,7 +19,7 @@ const int numCL = 50;	  // Kandidatu naujiems objektams skaicius (candidate loca
 const int numX = 3;	  // Nauju objektu skaicius
 
 double **demandPoints;	 // Geografiniai duomenys
-double **distanceMatrix; // Masyvas atstumu matricai saugoti
+double *distanceMatrix; // Masyvas atstumu matricai saugoti
 
 // int X[numX];        // Naujas sprendinys
 // int bestX[numX];    // Geriausias rastas sprendinys
@@ -57,7 +58,6 @@ struct UX {
    int *X;
 } ux;
 
-
 int main(int argc, char **argv) {
    MPI_Init(&argc, &argv);
 
@@ -86,16 +86,23 @@ int main(int argc, char **argv) {
    MPI_Buffer_attach(buffer, buffer_size);
 
    //----- Atstumu matricos skaiciavimas -------------------------------------
-   distanceMatrix = calloc(sizeof(double *), numDP);
+   int *lens = lengths(numDP, world_size);
+   // printf_each_int(lens, world_size + 1); printf("\n");
+
+   distanceMatrix = calloc(sizeof(double), numDP * numDP);
+   // for (int i = lens[world_rank]; i < lens[world_rank + 1]; i++) {
    for (int i = 0; i < numDP; i++) {
-      distanceMatrix[i] = calloc(sizeof(double), i + 1);
       for (int j = 0; j <= i; j++) {
-         distanceMatrix[i][j] = HaversineDistance4(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
+         double *ptr = distanceMatrix + (numDP * i + j);
+         *ptr = HaversineDistance4(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
       }
    }
+   // TODO: Scatter data
+   // TODO: Gather data
 
    printf("BARRIER A REACHED FROM %i\n", world_rank);
    MPI_Barrier(MPI_COMM_WORLD);
+   // exit(0);
 
    double t_matrix = getTime();
    printf("Matricos skaiciavimo trukme: %lf\n", t_matrix - t_start);
@@ -116,13 +123,8 @@ int main(int argc, char **argv) {
    unsigned int num_dones = 0;
    for (int ix = 0; ix < world_size; ++ix) { dones[ix] = dones[ix] & 0; }
 
-   int counter = 0;
-
 	// FILE *fp = fopen("c_main.tsv", "a+");
    while (true) {
-      // counter += 1;
-      // if (counter > 10 + 1) { break; }
-
       if (world_rank == 0 && increased) {
          // printf("MAIN| about to send(X)\n");
          for(int ix = 1; ix < world_size; ++ix) {
@@ -248,7 +250,7 @@ int main(int argc, char **argv) {
 
       display_results("stdout" , bestX, bestU);
       display_results("new.dat", bestX, bestU);
-      write_times(t_start, t_matrix, t_finish);
+      // write_times(t_start, t_matrix, t_finish);
    }
 
    MPI_Finalize();
@@ -282,9 +284,9 @@ double HaversineDistance4(double lat1, double lon1, double lat2, double lon2) {
 
 double HaversineDistance2(int i, int j) {
    if (i >= j)
-      return distanceMatrix[i][j];
+      return *(distanceMatrix + (numDP * i + j));
    else
-      return distanceMatrix[j][i];
+      return *(distanceMatrix + (numDP * j + i));
 }
 
 //=============================================================================
