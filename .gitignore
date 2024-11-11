@@ -5,5 +5,6 @@
 !justfile
 !lab1
 !lab2
+!lab2/results
 !mini
 !*.tsv
