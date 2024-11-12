@@ -401,8 +401,6 @@ Iš @fig2 matoma, kad matricos skaičiavimo ir sprendimo ieškojimo pagreitėjim
 #pagebreak()
 = Užduotis \#2
 
-
-
 #include "typst/1_attempt.typ"
 
 #include "typst/2_attempt.typ"
