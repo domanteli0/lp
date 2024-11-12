@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "shared.h"
 
 using namespace std;
 
@@ -18,7 +17,7 @@ int numCL = 50;                 // Kandidatu naujiems objektams skaicius (candid
 int numX  = 3;                  // Nauju objektu skaicius
 
 double **demandPoints;          // Geografiniai duomenys
-double *distanceMatrix;   	    // Masyvas atstumu matricai saugoti
+double **distanceMatrix;   	    // Masyvas atstumu matricai saugoti
 
 int *X = new int[numX];         // Naujas sprendinys
 int *bestX = new int[numX];     // Geriausias rastas sprendinys
@@ -35,58 +34,46 @@ int increaseX(int* X, int index, int maxindex);
 
 //=============================================================================
 void write_times(double t_start, double t_matrix, double t_finish);
-void display_results(char *filename, int *bestX);
-void printX(int *X);
-
-void printf_(char *_, ...) { }
-#define printf printf_
 
 int main() {
 	loadDemandPoints();             // Duomenu nuskaitymas is failo	
     double t_start = getTime();     // Algoritmo vykdymo pradzios laikas
 
     //----- Atstumu matricos skaiciavimas -------------------------------------
-    distanceMatrix = new double[numDP * numDP];
+    distanceMatrix = new double*[numDP];
 	for (int i=0; i<numDP; i++) {
+		distanceMatrix[i] = new double[i+1];
 		for (int j=0; j<=i; j++) {
-			distanceMatrix[i * numDP + j] = HaversineDistance(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
+			distanceMatrix[i][j] = HaversineDistance(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
 		}
 	}
     double t_matrix = getTime();
     cout << "Matricos skaiciavimo trukme: " << t_matrix - t_start << endl;
 
     //----- Pradines naujo ir geriausio sprendiniu reiksmes -------------------
-	// for (int i=0; i<numX; i++) {    // Pradines naujo ir geriausio sprendiniu koordinates: [0,1,2,...]
-	// 	X[i] = i;
-	// 	bestX[i] = i;
-	// }
-    u = 0;        // Naujo sprendinio naudingumas (utility)
+	for (int i=0; i<numX; i++) {    // Pradines naujo ir geriausio sprendiniu koordinates: [0,1,2,...]
+		X[i] = i;
+		bestX[i] = i;
+	}
+    u = evaluateSolution(X);        // Naujo sprendinio naudingumas (utility)
     bestU = u;                      // Geriausio sprendinio sprendinio naudingumas
 		
     //----- Visų galimų sprendinių perrinkimas --------------------------------
-	long long unsigned times = 0;
- 	int counter = 0;
-	bool increased = true;
-	while (increased) {
-		increased = increaseX(X, numX-1, numCL);
-		u = evaluateSolution(X);
-
+	while (increaseX(X, numX-1, numCL) == true) {
+        u = evaluateSolution(X);
         if (u > bestU) {
             bestU = u;
-			memcpy(bestX, X, sizeof(int) * numX);
+            for (int i=0; i<numX; i++) bestX[i] = X[i];
         }
 	}
 	
     //----- Rezultatu spausdinimas --------------------------------------------
 	double t_finish = getTime();     // Skaiciavimu pabaigos laikas
-	printf("Sprendinio paieskos trukme: %lf\n", t_finish - t_matrix);
-    printf("Algoritmo vykdymo trukme: %lf\n", t_finish - t_start);
-    printf("Geriausias sprendinys: ");
-	for (int i=0; i<numX; i++) printf("%i ", bestX[i]);
-	printf("(%lf procentai rinkos)\n", bestU);
-	printf("TIMES: %lli\n", times);
-
-	display_results("new.dat", bestX);
+	cout << "Sprendinio paieskos trukme: " << t_finish - t_matrix << endl;
+    cout << "Algoritmo vykdymo trukme: " << t_finish - t_start << endl;
+    cout << "Geriausias sprendinys: ";
+	for (int i=0; i<numX; i++) cout << bestX[i] << " ";
+	cout << "(" << bestU << " procentai rinkos)" << endl;
 
     write_times(t_start, t_matrix, t_finish);
 }
@@ -101,6 +88,7 @@ void loadDemandPoints() {
 		demandPoints[i] = new double[3];
 		fscanf(f, "%lf%lf%lf", &demandPoints[i][0], &demandPoints[i][1], &demandPoints[i][2]);
 	}
+	fclose(f);
 }
 
 //=============================================================================
@@ -116,8 +104,8 @@ double HaversineDistance(double lat1, double lon1, double lat2, double lon2) {
 }
 
 double HaversineDistance(int i, int j) {
-	if (i >= j)	return distanceMatrix[i * numDP + j];
-	else return distanceMatrix[j * numDP + i];
+	if (i >= j)	return distanceMatrix[i][j];
+	else return distanceMatrix[j][i];
 }
 
 //=============================================================================
@@ -173,30 +161,8 @@ int increaseX(int *X, int index, int maxindex) {
 	return 1;
 }
 
-//=============================================================================
-
-void display_results(char *filename, int *bestX) {
-   const char *cmp = "stdout";
-   FILE *fp;
-
-   if (strcmp(filename, cmp) == 0)
-   {
-      fp = stdout;
-   }
-   else
-   {
-      fp = fopen(filename, "w+");
-   }
-
-   for (int i = 0; i < numX; i++)
-   {
-      fprintf(fp, "%i\t", bestX[i]);
-   }
-   fprintf(fp, "\t%.3f\n", bestU);
-}
-
 void write_times(double t_start, double t_matrix, double t_finish) {
-   char *filename_buffer = "results/original.tsv";
+   char *filename_buffer = "results/1_original.tsv";
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;
@@ -206,9 +172,4 @@ void write_times(double t_start, double t_matrix, double t_finish) {
          t_matrix - t_start,
          t_finish - t_matrix,
          t_finish - t_start);
-}
-
-void printX(int *X) {
-   for(int ix = 0; ix < numX; ++ix) { printf("%i ", X[ix]); }
-   printf("\n");
 }

@@ -24,14 +24,14 @@
   align(left)[#it]
 )
 
-#align(center, text(18pt)[
-  = *Laboratorinis darbai*
+#align(center, text(26pt)[
+  *Laboratoriniai darbai*
 ])
 
 #align(center, text(15pt)[
   Domantas Keturakis \
   #text(13pt)[
-    Spalis 2024
+    Lapkritis 2024
   ]
   ]
  )
@@ -47,6 +47,12 @@
 ]
 
 #set par(justify: true)
+
+#outline(
+  title: [Turinys],
+)
+
+#pagebreak()
 
 = Užduotis \#1
 
@@ -401,16 +407,285 @@ Iš @fig2 matoma, kad matricos skaičiavimo ir sprendimo ieškojimo pagreitėjim
 #pagebreak()
 = Užduotis \#2
 
-#include "typst/1_attempt.typ"
+Sulygiagretinti skaičiavimus naudojantis `MPI` biblioteka.
 
-#include "typst/2_attempt.typ"
+== Pirma dalis
 
-#include "typst/3_attempt.typ"
+Sulygiagretinti sprendinio skaičiavimus.
 
-#include "typst/4_attempt.typ"
+=== Pirmas bandymas
 
-#include "typst/5_matrix.typ"
+Procesus galima paskirstyti taip, kad yra vienas pagrindinis (_main_) procesas ir likę - darbuotojai (_workers_).
+Kur pagrindinis procesas skaičiuoja atnaujintas `X` reikšmes ir jas išsiunčia kitiem procesam.
 
-#include "typst/6_matrix2.typ"
+```c
+int world_size; MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+int world_rank; MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-#include "typst/6_matrix3.typ"
+// Iškirpta: loadDemandPoints(), distanceMatrix skaičiavimas, MPI_Buffer_attach, t.t.
+MPI_Barrier(MPI_COMM_WORLD);
+
+bool increased = true;
+while (increased) {
+   int sends = 1;
+   if (world_rank == 0) {
+      for(int ix = 1; ix < world_size; ++ix) {
+         increased = increaseX(X, numX - 1, numCL);
+
+         MPI_Send(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
+         sends = ix + 1;
+
+         if (!increased) {
+            for (int ix = 1; ix < world_size; ++ix) {
+               MPI_Bsend(X, 0, MPI_BYTE, ix, SIGNAL_DONE, MPI_COMM_WORLD);
+            }
+            break;
+         }
+      }
+   }
+   // ...
+}
+```
+
+Radus galutinę `X` reikšmę pagrindinis procesas išsiučia žinutę su žyme `SIGNAL_DONE`, kad pranešti procesams darbuotojiems, kad šie gali baigti savo darbą.
+
+#pagebreak()
+
+Tuo tarpu procesai darbuotojai laukia naujos `X` reiškės, jos sulaukę, apskaičiuoja `u` reikšmę ir išsiunčia ją, kartu su `X`, pagrindiniam procesui. Taip pat jie patikrinina ar negavo žinutės su `SIGNAL_DONE` žyma, kurios pagalba jie sužino, kad daugiau negaus `X` reiškmių ir todėl gali baigti savo darbą.
+
+```c
+while(increased) {
+   // ...
+   if (world_rank != 0) {
+      MPI_Status status;
+      MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+      if (status.MPI_TAG == SIGNAL_DONE) {
+          MPI_Recv(NULL, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+          break;
+      }
+
+      MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      u = evaluateSolution(X);
+
+      MPI_Send(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+      MPI_Send(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+   }
+   // ...
+}
+```
+
+Tuo tarpu pagrindinis laukia tiek `u` ir `X` reikšmių kiek išsiuntė procesams darbuotojams, gavęs reikšmę su didesne `u` reikšme atnauja savo `bestU` ir `bestX` kintamuosius.
+
+```c
+while(increased) {
+   // ...
+   if (world_rank == 0) {
+      for (int ix = 1; ix < sends; ++ix) {
+         MPI_Recv(&u, 1, MPI_DOUBLE, ix, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         MPI_Recv(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+         if (u > bestU) {
+            bestU = u;
+            memcpy(bestX, X, sizeof(int) * numX);
+         }
+      }
+   }
+}
+```
+
+==== Rezultatai
+
+#let core1 = read_data(file: "../lab2/results/1_original.tsv", column: 2)
+#let all1 = read_data(file: "../lab2/results/1_original.tsv", column: 3)
+#let matrix1 = read_data(file: "../lab2/results/1_original.tsv", column: 1)
+
+#let beta = (core1 / all1)
+#let alpha = 1 - beta
+#let data_S_p = ((1, 1/(alpha + beta/1)), (2, 1/(alpha + beta/2)), (4, 1/(alpha + beta/4)), (8, 1/(alpha + beta/8)))
+
+#let data_linear = (
+  (1, 1), (2, 2), (4, 4), (8, 8)
+)
+
+// =============================================
+
+#let core2 = read_data(file: "../lab2/results/1_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab2/results/1_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab2/results/1_2.tsv", column: 1)
+
+#let core4 = read_data(file: "../lab2/results/1_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab2/results/1_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab2/results/1_4.tsv", column: 1)
+
+#let core8 = read_data(file: "../lab2/results/1_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab2/results/1_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab2/results/1_8.tsv", column: 1)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+
+#grid(
+  columns: 2,
+  gutter: 2mm,
+[#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    // Set-up a thin axis style
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+    )
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (7, 5),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      legend: "inner-north-west",
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: text(8pt)[Sprendimo paieškos pagreitėjimas],
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: text(8pt)[Programos pagreitėjimas],
+        )
+
+        plot.add(
+          data_linear,
+          style: (stroke: (paint: blue)), 
+          label: text(8pt)[Tiesinis pagreitėjimas],
+        )
+
+        plot.add(
+          data_S_p,
+          style: (stroke: (paint: rgb("#ff8104"))), 
+          label: text(8pt)[Teorinis pagreitėjimas],
+        )
+      })
+  })
+
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis]
+)<lab2_fig_1>],
+[
+#let core3 = read_data(file: "../lab2/results/1_3.tsv", column: 2)
+#let all3 = read_data(file: "../lab2/results/1_3.tsv", column: 3)
+#let matrix3 = read_data(file: "../lab2/results/1_3.tsv", column: 1)
+
+#let core5 = read_data(file: "../lab2/results/1_5.tsv", column: 2)
+#let all5 = read_data(file: "../lab2/results/1_5.tsv", column: 3)
+#let matrix5 = read_data(file: "../lab2/results/1_5.tsv", column: 1)
+
+#let core9 = read_data(file: "../lab2/results/1_9.tsv", column: 2)
+#let all9 = read_data(file: "../lab2/results/1_9.tsv", column: 3)
+#let matrix9 = read_data(file: "../lab2/results/1_9.tsv", column: 1)
+
+#let data_core = (
+  (2, core1 / core3), (4, core1 / core5), (8, core1 / core9)
+)
+
+#let data_all = (
+  (2, all1 / all3), (4, all1 / all5), (8, all1 / all9)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix3), (4, matrix1 / matrix5), (8, matrix1 / matrix9)
+)
+
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    // Set-up a thin axis style
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+    )
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (7, 5),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      legend: "inner-north-west",
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: text(8pt)[Sprendimo paieškos pagreitėjimas]
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: text(8pt)[Programos pagreitėjimas]
+        )
+
+        plot.add(
+          (x) => x,
+          domain: (1, 8),
+          style: (stroke: (paint: blue)), 
+          label: text(8pt)[Teisinis pagreitėjimas (-1)]
+        )
+        
+        plot.add(
+          data_S_p,
+          style: (stroke: (paint: rgb("#ff8104"))), 
+          label: text(8pt)[Teorinis pagreitėjimas (-1)]
+        )
+      })
+  })
+
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, neskaičiuojant pagrindinio proceso]
+) <lab2_fig_1_without_main>
+])
+
+Šis sprendimas iš ties yra prastas, net su 8 procesais sprendinio ieškojimas net nepasiekia puse teorinio (tiesinio) pagreitėjimo (@lab2_fig_1). Net neskaičiuojant pagrindinio proceso (@lab2_fig_1_without_main), t.y. skaičiuojant pagreitėjimą su 8 procesais ištikrųjų paleidžiami 9 procesai.
+
+=== Antras bandymas
+
+// #include "typst/2_attempt.typ"
+
+// #include "typst/3_attempt.typ"
+
+// #include "typst/4_attempt.typ"
+
+// #include "typst/5_matrix.typ"
+
+// #include "typst/6_matrix2.typ"
+
+// #include "typst/6_matrix3.typ"
