@@ -105,9 +105,10 @@ int main(int argc, char **argv) {
       }
    }
 
-   // printf("WORKER %i| lens: %i, lens[-1]: %i\n", world_rank, lens[world_rank], lens[world_rank + 1]);
+   printf("PROCESS %i| To send at: %lf\n", world_rank, getTime());
 
-   MPI_Allgatherv(
+   MPI_Request req;
+   MPI_Iallgatherv(
       distanceMatrix + disps[world_rank],
       counts[world_rank],
       MPI_DOUBLE,
@@ -115,20 +116,18 @@ int main(int argc, char **argv) {
       counts,
       disps,
       MPI_DOUBLE,
-      MPI_COMM_WORLD
+      MPI_COMM_WORLD,
+      &req
    );
 
-   if (world_rank == 0) {
-      printf_each_int(lens, world_size + 1); puts("");
-      printf_each_int(counts, world_size); puts("");
-   }
+   printf("PROCESS %i| To have received at: %lf\n", world_rank, getTime());
 
    // printf("BARRIER A REACHED FROM %i\n", world_rank);
    // MPI_Barrier(MPI_COMM_WORLD);
    // exit(0);
 
    double t_matrix = getTime();
-   printf("Matricos skaiciavimo trukme: %lf\n", t_matrix - t_start);
+   // printf("Matricos skaiciavimo trukme: %lf\n", t_matrix - t_start);
 
    //----- Pradines naujo ir geriausio sprendiniu reiksmes -------------------
    int *X = calloc(sizeof(int), numX);        // Naujas sprendinys
@@ -147,6 +146,7 @@ int main(int argc, char **argv) {
    for (int ix = 0; ix < world_size; ++ix) { dones[ix] = dones[ix] & 0; }
 
 	// FILE *fp = fopen("c_main.tsv", "a+");
+   bool first_run = true;
    while (true) {
       if (world_rank == 0 && increased) {
          // printf("MAIN| about to send(X)\n");
@@ -174,6 +174,7 @@ int main(int argc, char **argv) {
 
       if (world_rank == 0 && increased) {
          increased = increaseX(X, numX - 1, numCL);
+         if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
          
          u = evaluateSolution(X);
          if (u > bestU) {
@@ -213,6 +214,8 @@ int main(int argc, char **argv) {
             MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             // printf("WORKER %i| received X\n", world_rank);
             // printf("WORKER %i| x: ", world_rank); printX(X);
+
+            if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
 
             u = evaluateSolution(X);
 
@@ -392,7 +395,7 @@ void display_results(char *filename, int *bestX, double bestU) {
 
 void write_times(double t_start, double t_matrix, double t_finish) {
    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
-   sprintf(filename_buffer, "results/matrix_%i.tsv", world_size);
+   sprintf(filename_buffer, "results/matrix2_%i.tsv", world_size);
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;

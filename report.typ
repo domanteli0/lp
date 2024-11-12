@@ -408,3 +408,7 @@ Iš @fig2 matoma, kad matricos skaičiavimo ir sprendimo ieškojimo pagreitėjim
 #include "typst/3_attempt.typ"
 
 #include "typst/4_attempt.typ"
+
+#include "typst/5_matrix.typ"
+
+#include "typst/6_matrix2.typ"
