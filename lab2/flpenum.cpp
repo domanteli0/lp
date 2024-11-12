@@ -18,7 +18,7 @@ int numCL = 50;                 // Kandidatu naujiems objektams skaicius (candid
 int numX  = 3;                  // Nauju objektu skaicius
 
 double **demandPoints;          // Geografiniai duomenys
-double **distanceMatrix;   	    // Masyvas atstumu matricai saugoti
+double *distanceMatrix;   	    // Masyvas atstumu matricai saugoti
 
 int *X = new int[numX];         // Naujas sprendinys
 int *bestX = new int[numX];     // Geriausias rastas sprendinys
@@ -46,11 +46,10 @@ int main() {
     double t_start = getTime();     // Algoritmo vykdymo pradzios laikas
 
     //----- Atstumu matricos skaiciavimas -------------------------------------
-    distanceMatrix = new double*[numDP];
+    distanceMatrix = new double[numDP * numDP];
 	for (int i=0; i<numDP; i++) {
-		distanceMatrix[i] = new double[i+1];
 		for (int j=0; j<=i; j++) {
-			distanceMatrix[i][j] = HaversineDistance(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
+			distanceMatrix[i * numDP + j] = HaversineDistance(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
 		}
 	}
     double t_matrix = getTime();
@@ -68,23 +67,13 @@ int main() {
 	long long unsigned times = 0;
  	int counter = 0;
 	bool increased = true;
-	FILE *fp = fopen("cpp.tsv", "a+");
 	while (increased) {
 		increased = increaseX(X, numX-1, numCL);
 		u = evaluateSolution(X);
-		fprint_X(fp, u, X);
-
-		counter += 1;
-		// if (counter > 10 + 1) { break; }
-
-		times += 1;
-		printf("OOOOOOOOO| "); printX(X);
-        u = evaluateSolution(X);
-		printf("OOOOOOOOO| u: %lf\n", u);
 
         if (u > bestU) {
             bestU = u;
-            for (int i=0; i<numX; i++) bestX[i] = X[i];
+			memcpy(bestX, X, sizeof(int) * numX);
         }
 	}
 	
@@ -112,7 +101,6 @@ void loadDemandPoints() {
 		demandPoints[i] = new double[3];
 		fscanf(f, "%lf%lf%lf", &demandPoints[i][0], &demandPoints[i][1], &demandPoints[i][2]);
 	}
-	fclose(f);
 }
 
 //=============================================================================
@@ -128,8 +116,8 @@ double HaversineDistance(double lat1, double lon1, double lat2, double lon2) {
 }
 
 double HaversineDistance(int i, int j) {
-	if (i >= j)	return distanceMatrix[i][j];
-	else return distanceMatrix[j][i];
+	if (i >= j)	return distanceMatrix[i * numDP + j];
+	else return distanceMatrix[j * numDP + i];
 }
 
 //=============================================================================
