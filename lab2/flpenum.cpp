@@ -162,7 +162,7 @@ int increaseX(int *X, int index, int maxindex) {
 }
 
 void write_times(double t_start, double t_matrix, double t_finish) {
-   char *filename_buffer = "results/1_original.tsv";
+   char *filename_buffer = "results/4_original.tsv";
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;

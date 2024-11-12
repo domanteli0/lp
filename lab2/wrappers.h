@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <stdio.h>
 
 typedef struct WRP_Check {
    MPI_Status status;

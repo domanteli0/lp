@@ -676,8 +676,89 @@ while(increased) {
 
 Šis sprendimas iš ties yra prastas, net su 8 procesais sprendinio ieškojimas net nepasiekia puse teorinio (tiesinio) pagreitėjimo (@lab2_fig_1). Net neskaičiuojant pagrindinio proceso (@lab2_fig_1_without_main), t.y. skaičiuojant pagreitėjimą su 8 procesais ištikrųjų paleidžiami 9 procesai.
 
-=== Antras bandymas
+==== Antras bandymas
 
+Visgi galima padaryti taip, kad pagrindinis procesas irgi skaičiuotu `X` reikšmes.
+
+
+#let core2 = read_data(file: "../lab2/results/4_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab2/results/4_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab2/results/4_2.tsv", column: 1)
+
+#let core4 = read_data(file: "../lab2/results/4_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab2/results/4_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab2/results/4_4.tsv", column: 1)
+
+#let core8 = read_data(file: "../lab2/results/4_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab2/results/4_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab2/results/4_8.tsv", column: 1)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    // Set-up a thin axis style
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 70%),
+    )
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (10, 6),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      legend: "inner-north-west",
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: text(8pt)[Sprendimo paieškos pagreitėjimas],
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: text(8pt)[Programos pagreitėjimas],
+        )
+
+        plot.add(
+          data_linear,
+          style: (stroke: (paint: blue)), 
+          label: text(8pt)[Tiesinis pagreitėjimas],
+        )
+
+        plot.add(
+          data_S_p,
+          style: (stroke: (paint: rgb("#ff8104"))), 
+          label: text(8pt)[Teorinis pagreitėjimas],
+        )
+      })
+  })
+
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis]
+)<lab2_fig_1>
 // #include "typst/2_attempt.typ"
 
 // #include "typst/3_attempt.typ"
