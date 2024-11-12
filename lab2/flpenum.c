@@ -53,11 +53,6 @@ void printX(int *X);
 
 int world_size;
 
-struct UX {
-   double u;
-   int *X;
-} ux;
-
 int main(int argc, char **argv) {
    MPI_Init(&argc, &argv);
 
@@ -126,7 +121,7 @@ int main(int argc, char **argv) {
    // MPI_Barrier(MPI_COMM_WORLD);
    // exit(0);
 
-   double t_matrix = getTime();
+   double t_matrix = 0; // getTime();
    // printf("Matricos skaiciavimo trukme: %lf\n", t_matrix - t_start);
 
    //----- Pradines naujo ir geriausio sprendiniu reiksmes -------------------
@@ -174,7 +169,7 @@ int main(int argc, char **argv) {
 
       if (world_rank == 0 && increased) {
          increased = increaseX(X, numX - 1, numCL);
-         if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
+         if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; t_matrix = getTime(); }
          
          u = evaluateSolution(X);
          if (u > bestU) {
@@ -215,7 +210,7 @@ int main(int argc, char **argv) {
             // printf("WORKER %i| received X\n", world_rank);
             // printf("WORKER %i| x: ", world_rank); printX(X);
 
-            if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
+            if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; t_matrix = getTime(); }
 
             u = evaluateSolution(X);
 
@@ -395,7 +390,7 @@ void display_results(char *filename, int *bestX, double bestU) {
 
 void write_times(double t_start, double t_matrix, double t_finish) {
    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
-   sprintf(filename_buffer, "results/matrix2_%i.tsv", world_size);
+   sprintf(filename_buffer, "results/matrix3_%i.tsv", world_size);
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;
