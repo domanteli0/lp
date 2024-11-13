@@ -64,7 +64,6 @@
 #show outline.entry.where(
   level: 4
 ): it => {
-  v(0.5em, weak: true)
   emph(it.body)
 }
 
@@ -924,9 +923,15 @@ Kai procesas baigia savo dalį, jis nusiunčia nusiunčia kitiem procesam savo d
    )
 ```
 
-Galima pakeisti skaičiuoti ir naudojant `MPI_Iallgatherv`, pridedant prieš kiekvieną `evaluateSolution` (nes tik ten ir naudojami matricos duomenys) šią eilutę, tam, kad duomenys pirma būtų pilnai surinkti.
+Galima pakeisti duomenų apsikeitimą naudojant `MPI_Iallgatherv`, pridedant prieš kiekvieną `evaluateSolution` (nes tik ten ir naudojami matricos duomenys) šią eilutę, tam, kad duomenys pirma būtų pilnai surinkti.
 ```c
 if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
+```
+
+Tiesa tada laiko matavimas tampa šiek tiek netikslus, nes iškart po `MPI_Iallgatherv` nuskaitomas laikas. Galima sakyti, kad matricos skaičiavimas baigiasi tada, kai pirmą kartą prireikia matricos duomenų, t.y.:
+
+```c
+if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; t_matrix = getTime(); }
 ```
 
 #pagebreak()
@@ -1014,7 +1019,7 @@ TODO: actual data
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Allgather`)]
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Allgatherv`)]
 ) <lab2_fig_matrix_5>
 ] 
 
@@ -1040,21 +1045,24 @@ TODO: actual data
   (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
 )
 
-#align(center)[
-#figure(
+#grid(
+  columns: 2,
+  gutter: 2mm,
+[#figure(
   placement: none,
 [
   #canvas({
     import draw: *
 
-    // Set-up a thin axis style
-    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
-              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+    )
 
     plot.plot(
       x-min: 0.9, x-max: 8.1,
       y-min: 0.9, y-max: 8.1,
-      size: (10, 6),
+      size: (7, 4),
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
@@ -1062,41 +1070,136 @@ TODO: actual data
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
+      legend: "inner-north-west",
       {
 
         plot.add(
           data_core,
           style: (stroke: (paint: green, dash: "dashed")), 
-          label: "Sprendimo paieškos pagreitėjimas"
+          label: text(8pt)[Sprendimo paieškos pagreitėjimas]
         )
 
         plot.add(
           data_all,
           style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
-          label: "Programos pagreitėjimas"
-        )
-
-        plot.add(
-          (x) => x,
-          domain: (1, 8),
-          style: (stroke: (paint: blue)), 
-          label: "Tiesinis pagreitėjimas"
+          label: text(8pt)[Programos pagreitėjimas]
         )
 
         plot.add(
           data_matrix,
           // mark: "x", mark-size: 0.15,
           style: (stroke: (paint: orange)), 
-          label: "Matricos skaičiavimo pagreitėjimas",
+          label: text(8pt)[Matricos skaičiavimo pagreitėjimas]
+        )
+
+        plot.add(
+          (x) => x,
+          domain: (1, 8),
+          style: (stroke: (paint: blue)), 
+          label: text(8pt)[Tiesinis pagreitėjimas]
         )
       })
   })
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgather`)]
-) <lab2_fig_matrix_5>
-] 
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas iškart po `MPI_Iallgatherv`]
+) <lab2_fig_matrix_6>
+],
+[
+
+
+#let core2 = read_data(file: "../lab2/results/7_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab2/results/7_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab2/results/7_2.tsv", column: 1)
+
+#let core4 = read_data(file: "../lab2/results/7_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab2/results/7_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab2/results/7_4.tsv", column: 1)
+
+#let core8 = read_data(file: "../lab2/results/7_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab2/results/7_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab2/results/7_8.tsv", column: 1)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+  
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+    )
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (7, 4),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      legend: "inner-north-west",
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: text(8pt)[Sprendimo paieškos pagreitėjimas]
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: text(8pt)[Programos pagreitėjimas]
+        )
+
+        plot.add(
+          data_matrix,
+          // mark: "x", mark-size: 0.15,
+          style: (stroke: (paint: orange)), 
+          label: text(8pt)[Matricos skaičiavimo pagreitėjimas]
+        )
+
+        plot.add(
+          (x) => x,
+          domain: (1, 8),
+          style: (stroke: (paint: blue)), 
+          label: text(8pt)[Tiesinis pagreitėjimas]
+        )
+      })
+  })
+  
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas kai matricos prireikia pirmą kartą]
+) <lab2_fig_matrix_7>],
+[
+])
 
 #pagebreak()
 = Priedai <appendixes>
