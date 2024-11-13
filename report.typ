@@ -907,6 +907,8 @@ int main() {
    // ...
 ```
 
+Čia svarbu paminėti, kad `distanceMatrix` tipas buvo pakeistas iš `double **` į `double *` ir atmintis visai matricai priskiriamia iškarto `calloc(sizeof(double), numDP * numDP)`, prieeiga prie patricos irgi atitinkamai pakeista iš `distanceMatrix[i][j] = v` į `distanceMatrix[i * numDP + j] = v`. Kadangi šis pakeitimas iš esmės pakeičia greitaveikos savybės (eksperimentiškai visos programos skaičiavimas sumažėja nuo ~22s iki ~17s), tai pradinė programa, su kuria lygininama lygiagretinta programa, irgi buvo pakeista, tam kad palyginimai būtų teisingi.
+
 Kai procesas baigia savo dalį, jis nusiunčia nusiunčia kitiem procesam savo dalį ir laukia kitų dalių naudojant `MPI_Allgatherv`.
 
 ```c
@@ -922,22 +924,31 @@ Kai procesas baigia savo dalį, jis nusiunčia nusiunčia kitiem procesam savo d
    )
 ```
 
+Galima pakeisti skaičiuoti ir naudojant `MPI_Iallgatherv`, pridedant prieš kiekvieną `evaluateSolution` (nes tik ten ir naudojami matricos duomenys) šią eilutę, tam, kad duomenys pirma būtų pilnai surinkti.
+```c
+if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
+```
+
 #pagebreak()
 === Rezultatai
 
 TODO: actual data
 
-#let core2 = read_data(file: "../lab2/results/4_2.tsv", column: 2)
-#let all2 = read_data(file: "../lab2/results/4_2.tsv", column: 3)
-#let matrix2 = read_data(file: "../lab2/results/4_2.tsv", column: 1)
+#let core1 = read_data(file: "../lab2/results/5_original.tsv", column: 2)
+#let all1 = read_data(file: "../lab2/results/5_original.tsv", column: 3)
+#let matrix1 = read_data(file: "../lab2/results/5_original.tsv", column: 1)
 
-#let core4 = read_data(file: "../lab2/results/4_4.tsv", column: 2)
-#let all4 = read_data(file: "../lab2/results/4_4.tsv", column: 3)
-#let matrix4 = read_data(file: "../lab2/results/4_4.tsv", column: 1)
+#let core2 = read_data(file: "../lab2/results/5_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab2/results/5_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab2/results/5_2.tsv", column: 1)
 
-#let core8 = read_data(file: "../lab2/results/4_8.tsv", column: 2)
-#let all8 = read_data(file: "../lab2/results/4_8.tsv", column: 3)
-#let matrix8 = read_data(file: "../lab2/results/4_8.tsv", column: 1)
+#let core4 = read_data(file: "../lab2/results/5_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab2/results/5_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab2/results/5_4.tsv", column: 1)
+
+#let core8 = read_data(file: "../lab2/results/5_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab2/results/5_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab2/results/5_8.tsv", column: 1)
 
 #let data_core = (
   (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
@@ -1003,8 +1014,88 @@ TODO: actual data
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas]
-) <lab2_fig_matrix>
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Allgather`)]
+) <lab2_fig_matrix_5>
+] 
+
+#let core2 = read_data(file: "../lab2/results/6_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab2/results/6_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab2/results/6_2.tsv", column: 1)
+
+#let core4 = read_data(file: "../lab2/results/6_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab2/results/6_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab2/results/6_4.tsv", column: 1)
+
+#let core8 = read_data(file: "../lab2/results/6_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab2/results/6_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab2/results/6_8.tsv", column: 1)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+
+#align(center)[
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    // Set-up a thin axis style
+    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (10, 6),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: "Sprendimo paieškos pagreitėjimas"
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: "Programos pagreitėjimas"
+        )
+
+        plot.add(
+          (x) => x,
+          domain: (1, 8),
+          style: (stroke: (paint: blue)), 
+          label: "Tiesinis pagreitėjimas"
+        )
+
+        plot.add(
+          data_matrix,
+          // mark: "x", mark-size: 0.15,
+          style: (stroke: (paint: orange)), 
+          label: "Matricos skaičiavimo pagreitėjimas",
+        )
+      })
+  })
+  
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgather`)]
+) <lab2_fig_matrix_5>
 ] 
 
 #pagebreak()
@@ -1043,15 +1134,3 @@ int *lengths(int leg_length, int process_count) {
   caption: [Optimalus intervalus parinkimas]
 ) <choose_interval>
 
-
-// #include "typst/2_attempt.typ"
-
-// #include "typst/3_attempt.typ"
-
-// #include "typst/4_attempt.typ"
-
-// #include "typst/5_matrix.typ"
-
-// #include "typst/6_matrix2.typ"
-
-// #include "typst/6_matrix3.typ"

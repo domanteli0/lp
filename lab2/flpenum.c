@@ -92,8 +92,8 @@ int main(int argc, char **argv) {
       }
    }
 
-   // MPI_Request req;
-   MPI_Allgatherv(
+   MPI_Request req;
+   MPI_Iallgatherv(
       distanceMatrix + disps[world_rank],
       counts[world_rank],
       MPI_DOUBLE,
@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
       disps,
       MPI_DOUBLE,
       MPI_COMM_WORLD
-      // ,&req
+      ,&req
    );
 
    double t_matrix = getTime();
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
 
    int sends = 0;
    int receives = 0;
-   // bool first_run = true;
+   bool first_run = true;
    while (true) {
       if (world_rank == 0 && increased) {
          for(int ix = 1; ix < world_size; ++ix) {
@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
 
       if (world_rank == 0 && increased) {
          increased = increaseX(X, numX - 1, numCL);
-         // if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
+         if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
          
          u = evaluateSolution(X);
          if (u > bestU) {
@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
 
          if (master_sent_X) {
             MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            // if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
+            if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
 
             u = evaluateSolution(X);
             if (bestU < u) { bestU = u; bestX = memcpy(bestX, X, sizeof(int) * numX); }
@@ -309,7 +309,7 @@ int increaseX(int *X, int index, int maxindex) {
 
 void write_times(double t_start, double t_matrix, double t_finish) {
    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
-   sprintf(filename_buffer, "results/5_%i.tsv", world_size);
+   sprintf(filename_buffer, "results/6_%i.tsv", world_size);
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;
