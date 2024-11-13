@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "shared.h"
 
 using namespace std;
 
@@ -75,6 +76,7 @@ int main() {
 	for (int i=0; i<numX; i++) cout << bestX[i] << " ";
 	cout << "(" << bestU << " procentai rinkos)" << endl;
 
+    display_results("new.dat", bestX, bestU);
     write_times(t_start, t_matrix, t_finish);
 }
 

@@ -47,7 +47,6 @@ void printf_(char *_, ...) { }
 #define DATA_U 2
 #define DATA_BEST_U 3
 
-void display_results(char *filename, int *bestX, double bestU);
 void write_times(double t_start, double t_matrix, double t_finish);
 void printX(int *X);
 
@@ -106,7 +105,6 @@ int main(int argc, char **argv) {
    bool increased = true;
    unsigned char dones[world_size];
    int dummy_load = 0;
-   int num_dones = 1;
    for (int ix = 0; ix < world_size; ++ix) { dones[ix] = dones[ix] & 0; }
 
    int sends = 0;
@@ -122,7 +120,6 @@ int main(int argc, char **argv) {
                for (int ix = 1; ix < world_size; ++ix) {
                   MPI_Bsend(&dummy_load, 1, MPI_INT, ix, SIGNAL_DONE, MPI_COMM_WORLD);
                }
-               // printf("MAIN| sends: %i, receives: %i\n", sends, receives);
                break;
             }
          }
@@ -141,33 +138,34 @@ int main(int argc, char **argv) {
             for (int ix = 1; ix < world_size; ++ix) {
                MPI_Bsend(&dummy_load, 1, MPI_INT, ix, SIGNAL_DONE, MPI_COMM_WORLD);
             }
-            // printf("MAIN| sends: %i, receives: %i\n", sends, receives);
          }
       }
 
       if (world_rank != 0) {
-         bool master_done = WRP_Check_for(0, SIGNAL_DONE, MPI_COMM_WORLD);
-         // if (master_done) { printf("WORKER %i| DONE\n", world_rank); break; }
-         if (master_done) { break; }
+         int master_done = WRP_Check_for(0, SIGNAL_DONE, MPI_COMM_WORLD);
+         int master_sent_X = WRP_Check_for(0, DATA_X, MPI_COMM_WORLD);
 
-         MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         if (master_sent_X) {
+            MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-         u = evaluateSolution(X);
+            u = evaluateSolution(X);
+            if (bestU < u) { bestU = u; bestX = memcpy(bestX, X, sizeof(int) * numX); }
 
-         MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
-         MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+            MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+            MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+            sends += 1;
+         }
+
+         if (master_done && !master_sent_X) { break; }
       }
 
       if (world_rank == 0) {
          if (!increased && receives == sends) { break; }
 
-         MPI_Status status;
-         int worker_sent_X;
-         MPI_Iprobe(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, &worker_sent_X, &status);
-         while(worker_sent_X) {
-            // printf("MAIN| receives: %i\n", receives);
-            MPI_Recv(&copy_u, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Recv(copy_X, numX, MPI_INT, MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         WRP_Check worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
+         while(worker_sent_X.flag) {
+            MPI_Recv(&copy_u, 1, MPI_DOUBLE, worker_sent_X.status.MPI_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(copy_X, numX, MPI_INT, worker_sent_X.status.MPI_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             receives += 1;
 
             if (copy_u > bestU) {
@@ -175,7 +173,7 @@ int main(int argc, char **argv) {
                memcpy(bestX, copy_X, sizeof(int) * numX);
             }
 
-            worker_sent_X = WRP_Check_for(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
+            worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
          }
       }
    }
@@ -290,26 +288,6 @@ int increaseX(int *X, int index, int maxindex) {
 
 //=============================================================================
 
-void display_results(char *filename, int *bestX, double bestU) {
-   const char *cmp = "stdout";
-   FILE *fp;
-
-   if (strcmp(filename, cmp) == 0)
-   {
-      fp = stdout;
-   }
-   else
-   {
-      fp = fopen(filename, "w+");
-   }
-
-   for (int i = 0; i < numX; i++)
-   {
-      fprintf(fp, "%i\t", bestX[i]);
-   }
-   fprintf(fp, "\t%.3f\n", bestU);
-}
-
 void write_times(double t_start, double t_matrix, double t_finish) {
    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
    sprintf(filename_buffer, "results/4_%i.tsv", world_size);
@@ -324,9 +302,4 @@ void write_times(double t_start, double t_matrix, double t_finish) {
          t_finish - t_start);
    
    fclose(fp);
-}
-
-void printX(int *X) {
-   for(int ix = 0; ix < numX; ++ix) { printf("%i ", X[ix]); }
-   printf("\n");
 }

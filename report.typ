@@ -58,7 +58,6 @@
 #show outline.entry.where(
   level: 2
 ): it => {
-  v(0.5em, weak: true)
   strong(it.body)
 }
 
@@ -68,7 +67,6 @@
   v(0.5em, weak: true)
   emph(it.body)
 }
-
 
 #outline(
   indent: 0.5em,
@@ -747,9 +745,28 @@ while(true) {
 }
 ```
 
-Procesams darbuotojams ne daug kas keičiasi apart to, kad jie irgi vietoje `MPI_Send` naudoja `MPI_Bsend`.
+Procesams darbuotojams pagrinde ne daug kas keičiasi. Jie irgi pakeičia `MPI_Send` į `MPI_Bsend`.
 
-// `WRP_Check_for(int source, int tag, MPI_Comm comm)` viduje naudoja `MPI_Iprobe(int source, int tag, MPI_Comm communicator, int* flag, MPI_Status* status)` ir gražina `flag` dalį.
+```c
+   if (world_rank != 0) {
+      int master_done = WRP_Check_for(0, SIGNAL_DONE, MPI_COMM_WORLD);
+      int master_sent_X = WRP_Check_for(0, DATA_X, MPI_COMM_WORLD);
+
+      if (master_sent_X) {
+         MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+         u = evaluateSolution(X);
+         if (bestU < u) { bestU = u; bestX = memcpy(bestX, X, sizeof(int) * numX); }
+
+         MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+         MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+      }
+
+      if (master_done && !master_sent_X) { break; }
+   }
+```
+
+Čia `WRP_Check_for(int source, int tag, MPI_Comm comm)` (apibrėžimas @WRP_Check_for) viduje naudoja `MPI_Iprobe(int source, int tag, MPI_Comm communicator, int* flag, MPI_Status* status)` ir gražina `flag` dalį.
 
 ```c
    if (world_rank == 0) {
@@ -759,8 +776,8 @@ Procesams darbuotojams ne daug kas keičiasi apart to, kad jie irgi vietoje `MPI
       int worker_sent_X;
       MPI_Iprobe(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, &worker_sent_X, &status);
       while(worker_sent_X) {
-         MPI_Recv(&copy_u, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-         MPI_Recv(copy_X, numX, MPI_INT, MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         MPI_Recv(&copy_u, 1, MPI_DOUBLE, status.MPI_STATUS, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         MPI_Recv(copy_X, numX, MPI_INT, status.MPI_STATUS, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
          receives += 1;
 
          if (copy_u > bestU) {
@@ -992,6 +1009,20 @@ TODO: actual data
 
 #pagebreak()
 = Priedai <appendixes>
+
+#figure(
+  placement: none,
+```c
+int WRP_Check_for(int source, int tag, MPI_Comm comm) {
+   MPI_Status status;
+   int flag;
+   MPI_Iprobe(source, tag, comm, &flag, &status);
+
+   return flag;
+}
+```,
+  caption: [Optimalus intervalus parinkimas]
+) <WRP_Check_for>
 
 #figure(
   placement: none,
