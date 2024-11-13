@@ -5,12 +5,12 @@
 #import "typst/data.typ": *
 
 #show: codly.codly-init.with()
-
 #let pageref(label) = context {
   let loc = locate(label)
   let nums = counter(page).at(loc)
   link(label, str(nums.first()))
 }
+
 
 #set figure(
   supplement: [Pav.]
@@ -48,7 +48,30 @@
 
 #set par(justify: true)
 
+#show outline.entry.where(
+  level: 1
+): it => {
+  v(1em, weak: true)
+  strong(underline(smallcaps(it.body)))
+}
+
+#show outline.entry.where(
+  level: 2
+): it => {
+  v(0.5em, weak: true)
+  strong(it.body)
+}
+
+#show outline.entry.where(
+  level: 4
+): it => {
+  v(0.5em, weak: true)
+  emph(it.body)
+}
+
+
 #outline(
+  indent: 0.5em,
   title: [Turinys],
 )
 
@@ -674,7 +697,7 @@ while(increased) {
 ) <lab2_fig_1_without_main>
 ])
 
-Šis sprendimas iš ties yra prastas, net su 8 procesais sprendinio ieškojimas net nepasiekia puse teorinio (tiesinio) pagreitėjimo (@lab2_fig_1). Net neskaičiuojant pagrindinio proceso (@lab2_fig_1_without_main), t.y. skaičiuojant pagreitėjimą su 8 procesais ištikrųjų paleidžiami 9 procesai.
+Šis sprendimas nėra prastas (@lab2_fig_1), bet pilnai neišnaudoja pagrindinio proceso, galima daryti išvadas, kad jis dažnai neturi darbo ir laukio kol galės kitiem procesam išsiųsti atnaujintas `X` reikšmes. Neskaičiuojant pagrindinio proceso (@lab2_fig_1_without_main), t.y. skaičiuojant pagreitėjimą su 8 procesais ištikrųjų paleidžiami 9 procesai, praktiškai pasiekiamas teorinis pagreitėjimas.
 
 ==== Antras bandymas
 
@@ -686,6 +709,7 @@ while (true) {
       for(int ix = 1; ix < world_size; ++ix) {
          increased = increaseX(X, numX - 1, numCL);
          MPI_Bsend(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
+         sends += 1;
 
          if (!increased) {
             for (int ix = 1; ix < world_size; ++ix) {
@@ -723,70 +747,30 @@ while(true) {
 }
 ```
 
-Kadangi pragrindinis procesas nebežino kurios žinutės buvo pristatytos, procesai darbuotojai taip pat išsiunčia `SIGNAL_WORKER_DONE`.
+Procesams darbuotojams ne daug kas keičiasi apart to, kad jie irgi vietoje `MPI_Send` naudoja `MPI_Bsend`.
+
+// `WRP_Check_for(int source, int tag, MPI_Comm comm)` viduje naudoja `MPI_Iprobe(int source, int tag, MPI_Comm communicator, int* flag, MPI_Status* status)` ir gražina `flag` dalį.
 
 ```c
-while(true) {
-  // ...
-  if (world_rank != 0) {
-    bool master_done = WRP_Check_for(0, SIGNAL_DONE, MPI_COMM_WORLD);
-    if (master_done) {
-  MPI_Recv(&dummy_load, 1, MPI_INT, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      MPI_Send(&dummy_load, 1, MPI_INT, 0, SIGNAL_WORKER_DONE, MPI_COMM_WORLD);
-      break;
-    }
+   if (world_rank == 0) {
+      if (!increased && receives == sends) { break; }
 
-    bool master_sent_X = WRP_Check_for(0, DATA_X, MPI_COMM_WORLD);
-    if (master_sent_X) {
-      MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Status status;
+      int worker_sent_X;
+      MPI_Iprobe(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, &worker_sent_X, &status);
+      while(worker_sent_X) {
+         MPI_Recv(&copy_u, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         MPI_Recv(copy_X, numX, MPI_INT, MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         receives += 1;
 
-      u = evaluateSolution(X);
+         if (copy_u > bestU) {
+            bestU = copy_u;
+            memcpy(bestX, copy_X, sizeof(int) * numX);
+         }
 
-      MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
-      MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
-    }
-  }
-  // ...
-}
-```
-
-`WRP_Check_for_(int source, int tag, MPI_Comm comm)` gražina strūktūrą nusąkančia ar žinutė pristatyta, viduje naudojant `MPI_Iprobe`, atitinkamai, `WRP_Check_for` gražina tik `flag` dalį.
-
-```c
-typedef struct WRP_Check {
-   MPI_Status status;
-   int flag;
-} WRP_Check;
-```
-
-
-
-```c
-while(true) {
-  // ...
-  if (world_rank == 0) {
-    WRP_Check worker_check = WRP_Check_for_(MPI_ANY_SOURCE, SIGNAL_WORKER_DONE, MPI_COMM_WORLD);
-    if (worker_check.flag) {
-      MPI_Recv(&dummy_load, 1, MPI_INT, MPI_ANY_SOURCE, SIGNAL_WORKER_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      num_dones += 1;
-    }
-
-    if (num_dones == world_size) { break; }
-
-    WRP_Check worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
-    while(worker_sent_X.flag) {
-      MPI_Recv(&copy_u, 1, MPI_DOUBLE, worker_sent_X.status.MPI_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      MPI_Recv(copy_X, numX, MPI_INT, worker_sent_X.status.MPI_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-      if (copy_u > bestU) {
-         bestU = copy_u;
-         memcpy(bestX, copy_X, sizeof(int) * numX);
+         worker_sent_X = WRP_Check_for(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
       }
-
-      worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
-    }
-  }
-}
+   }
 ```
 
 
@@ -868,6 +852,166 @@ while(true) {
   supplement: "Fig. ",
   caption: [Pagreitėjimo ir Procesorių skaičiaus santykis]
 )<lab2_fig_4>
+
+Šis metodas pasieka teorinį pagreitėjimą be papildomo proceso.
+
+#pagebreak()
+== Antra dalis
+
+=== Užduotis
+
+Sulygiagretinti matricos skaičiavimus.
+
+=== Lygiagretinimas
+
+Tam, kad gerai sulygiagretinti, reikia paskirstyti skaičiavimus taip, kad kiekvienas procesas tūrėtų po tiek pat darbo. Tam panaudojama funkcija `lengths` (Jos apibrėžimas - @choose_interval), kuri parenka tinkamus intervalus, taip, kad kiekvienas procesas paskaičiuotu apytiksliai tiek pat matricos elementų.
+
+```c
+int main() {
+   // ...
+   int *lens = lengths(numDP, world_size);
+   int *counts = calloc(sizeof(int), world_size);
+   for (int ix = 0; ix < world_size; ++ix) {
+      counts[ix] = (lens[ix + 1] - lens[ix]) * numDP;
+   }
+
+   int *disps = calloc(sizeof(int), world_size);
+   for (int ix = 0; ix < world_size; ++ix) {
+      disps[ix] = lens[ix] * numDP;
+   }
+
+   distanceMatrix = calloc(sizeof(double), numDP * numDP);
+   for (int i = lens[world_rank]; i < lens[world_rank + 1]; i++) {
+      for (int j = 0; j <= i; j++) {
+         distanceMatrix[numDP * i + j] =
+            HaversineDistance4(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
+      }
+   }
+   // ...
+```
+
+Kai procesas baigia savo dalį, jis nusiunčia nusiunčia kitiem procesam savo dalį ir laukia kitų dalių naudojant `MPI_Allgatherv`.
+
+```c
+   MPI_Allgatherv(
+      distanceMatrix + disps[world_rank],
+      counts[world_rank],
+      MPI_DOUBLE,
+      distanceMatrix,
+      counts,
+      disps,
+      MPI_DOUBLE,
+      MPI_COMM_WORLD
+   )
+```
+
+#pagebreak()
+=== Rezultatai
+
+TODO: actual data
+
+#let core2 = read_data(file: "../lab2/results/4_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab2/results/4_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab2/results/4_2.tsv", column: 1)
+
+#let core4 = read_data(file: "../lab2/results/4_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab2/results/4_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab2/results/4_4.tsv", column: 1)
+
+#let core8 = read_data(file: "../lab2/results/4_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab2/results/4_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab2/results/4_8.tsv", column: 1)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+
+#align(center)[
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    // Set-up a thin axis style
+    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (10, 6),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Procesorių skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: "Sprendimo paieškos pagreitėjimas"
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: "Programos pagreitėjimas"
+        )
+
+        plot.add(
+          (x) => x,
+          domain: (1, 8),
+          style: (stroke: (paint: blue)), 
+          label: "Tiesinis pagreitėjimas"
+        )
+
+        plot.add(
+          data_matrix,
+          // mark: "x", mark-size: 0.15,
+          style: (stroke: (paint: orange)), 
+          label: "Matricos skaičiavimo pagreitėjimas",
+        )
+      })
+  })
+  
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas]
+) <lab2_fig_matrix>
+] 
+
+#pagebreak()
+= Priedai <appendixes>
+
+#figure(
+  placement: none,
+```c
+int *lengths(int leg_length, int process_count) {
+    int area = leg_length * leg_length / 2;
+
+    int small_area = area / process_count;
+    int *lenghts = calloc(sizeof(int), process_count + 1);
+    for (int ix = 1; ix < process_count; ++ix) {
+        lenghts[ix] = (int) sqrt(2 * ( ix ) * small_area);
+    }
+    lenghts[process_count] = leg_length;
+
+    return lenghts;
+}
+```,
+  caption: [Optimalus intervalus parinkimas]
+) <choose_interval>
+
 
 // #include "typst/2_attempt.typ"
 
