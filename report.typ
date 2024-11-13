@@ -455,23 +455,23 @@ Tuo tarpu procesai darbuotojai laukia naujos `X` reiškės, jos sulaukę, apskai
 
 ```c
 while(increased) {
-   // ...
-   if (world_rank != 0) {
-      MPI_Status status;
-      MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+  // ...
+  if (world_rank != 0) {
+    MPI_Status status;
+    MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-      if (status.MPI_TAG == SIGNAL_DONE) {
-          MPI_Recv(NULL, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-          break;
-      }
+    if (status.MPI_TAG == SIGNAL_DONE) {
+     MPI_Recv(NULL, 0, MPI_BYTE, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+     break;
+    }
 
-      MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      u = evaluateSolution(X);
+    MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    u = evaluateSolution(X);
 
-      MPI_Send(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
-      MPI_Send(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
-   }
-   // ...
+    MPI_Send(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+    MPI_Send(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+  }
+  // ...
 }
 ```
 
@@ -678,7 +678,116 @@ while(increased) {
 
 ==== Antras bandymas
 
-Visgi galima padaryti taip, kad pagrindinis procesas irgi skaičiuotu `X` reikšmes.
+Visgi galima padaryti taip, kad pagrindinis procesas irgi skaičiuotu `X` reikšmes. Kad procesai darbuotojai nelauktų, kol pagrindinis procesas baigs skaičiuoti savo dalį, nebelaukiama atsakymo iš procesų darbuotojų, `X` siuntimui pasitelkiamas `MPI_Bsend`.
+
+```c
+while (true) {
+   if (world_rank == 0 && increased) {
+      for(int ix = 1; ix < world_size; ++ix) {
+         increased = increaseX(X, numX - 1, numCL);
+         MPI_Bsend(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
+
+         if (!increased) {
+            for (int ix = 1; ix < world_size; ++ix) {
+               MPI_Bsend(&dummy_load, 1, MPI_INT, ix, SIGNAL_DONE, MPI_COMM_WORLD);
+            }
+            break;
+         }
+      }
+   }
+// ...
+}
+```
+
+Toliau `while` cikle pridedamas paskaičiavimas pagrindiniam procesui ir `SIGNAL_DONE` išsiuntimas, jeigu šiame cikle baigtusi `X` skaičiavimas:
+
+```c
+while(true) {
+   // ...
+   if (world_rank == 0 && increased) {
+      increased = increaseX(X, numX - 1, numCL);
+      
+      u = evaluateSolution(X);
+      if (u > bestU) {
+         bestU = u;
+         memcpy(bestX, X, sizeof(int) * numX);
+      }
+
+      if (!increased) {
+         for (int ix = 1; ix < world_size; ++ix) {
+            MPI_Bsend(&dummy_load, 1, MPI_INT, ix, SIGNAL_DONE, MPI_COMM_WORLD);
+         }
+      }
+   }
+   // ...
+}
+```
+
+Kadangi pragrindinis procesas nebežino kurios žinutės buvo pristatytos, procesai darbuotojai taip pat išsiunčia `SIGNAL_WORKER_DONE`.
+
+```c
+while(true) {
+  // ...
+  if (world_rank != 0) {
+    bool master_done = WRP_Check_for(0, SIGNAL_DONE, MPI_COMM_WORLD);
+    if (master_done) {
+  MPI_Recv(&dummy_load, 1, MPI_INT, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Send(&dummy_load, 1, MPI_INT, 0, SIGNAL_WORKER_DONE, MPI_COMM_WORLD);
+      break;
+    }
+
+    bool master_sent_X = WRP_Check_for(0, DATA_X, MPI_COMM_WORLD);
+    if (master_sent_X) {
+      MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+      u = evaluateSolution(X);
+
+      MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+      MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
+    }
+  }
+  // ...
+}
+```
+
+`WRP_Check_for_(int source, int tag, MPI_Comm comm)` gražina strūktūrą nusąkančia ar žinutė pristatyta, viduje naudojant `MPI_Iprobe`, atitinkamai, `WRP_Check_for` gražina tik `flag` dalį.
+
+```c
+typedef struct WRP_Check {
+   MPI_Status status;
+   int flag;
+} WRP_Check;
+```
+
+
+
+```c
+while(true) {
+  // ...
+  if (world_rank == 0) {
+    WRP_Check worker_check = WRP_Check_for_(MPI_ANY_SOURCE, SIGNAL_WORKER_DONE, MPI_COMM_WORLD);
+    if (worker_check.flag) {
+      MPI_Recv(&dummy_load, 1, MPI_INT, MPI_ANY_SOURCE, SIGNAL_WORKER_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      num_dones += 1;
+    }
+
+    if (num_dones == world_size) { break; }
+
+    WRP_Check worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
+    while(worker_sent_X.flag) {
+      MPI_Recv(&copy_u, 1, MPI_DOUBLE, worker_sent_X.status.MPI_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(copy_X, numX, MPI_INT, worker_sent_X.status.MPI_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+      if (copy_u > bestU) {
+         bestU = copy_u;
+         memcpy(bestX, copy_X, sizeof(int) * numX);
+      }
+
+      worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
+    }
+  }
+}
+```
 
 
 #let core2 = read_data(file: "../lab2/results/4_2.tsv", column: 2)
@@ -758,7 +867,8 @@ Visgi galima padaryti taip, kad pagrindinis procesas irgi skaičiuotu `X` reikš
 ],
   supplement: "Fig. ",
   caption: [Pagreitėjimo ir Procesorių skaičiaus santykis]
-)<lab2_fig_1>
+)<lab2_fig_4>
+
 // #include "typst/2_attempt.typ"
 
 // #include "typst/3_attempt.typ"

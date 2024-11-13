@@ -109,16 +109,20 @@ int main(int argc, char **argv) {
    int num_dones = 1;
    for (int ix = 0; ix < world_size; ++ix) { dones[ix] = dones[ix] & 0; }
 
+   int sends = 0;
+   int receives = 0;
    while (true) {
       if (world_rank == 0 && increased) {
          for(int ix = 1; ix < world_size; ++ix) {
             increased = increaseX(X, numX - 1, numCL);
             MPI_Bsend(X, numX, MPI_INT, ix, DATA_X, MPI_COMM_WORLD);
+            sends += 1;
 
             if (!increased) {
                for (int ix = 1; ix < world_size; ++ix) {
                   MPI_Bsend(&dummy_load, 1, MPI_INT, ix, SIGNAL_DONE, MPI_COMM_WORLD);
                }
+               // printf("MAIN| sends: %i, receives: %i\n", sends, receives);
                break;
             }
          }
@@ -137,54 +141,44 @@ int main(int argc, char **argv) {
             for (int ix = 1; ix < world_size; ++ix) {
                MPI_Bsend(&dummy_load, 1, MPI_INT, ix, SIGNAL_DONE, MPI_COMM_WORLD);
             }
+            // printf("MAIN| sends: %i, receives: %i\n", sends, receives);
          }
       }
 
       if (world_rank != 0) {
-         WRP_Check master_done = WRP_Check_for_(0, SIGNAL_DONE, MPI_COMM_WORLD);
-         if (master_done.flag) {
-            MPI_Recv(&dummy_load, 1, MPI_INT, 0, SIGNAL_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Send(&dummy_load, 1, MPI_INT, 0, SIGNAL_WORKER_DONE, MPI_COMM_WORLD);
-            break;
-         }
+         bool master_done = WRP_Check_for(0, SIGNAL_DONE, MPI_COMM_WORLD);
+         // if (master_done) { printf("WORKER %i| DONE\n", world_rank); break; }
+         if (master_done) { break; }
 
-         bool master_sent_X = WRP_Check_for(0, DATA_X, MPI_COMM_WORLD);
-         if (master_sent_X) {
-            MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-            u = evaluateSolution(X);
+         u = evaluateSolution(X);
 
-            MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
-            MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
-         }
+         MPI_Bsend(&u, 1, MPI_DOUBLE, 0, DATA_U, MPI_COMM_WORLD);
+         MPI_Bsend(X, numX, MPI_INT,  0, DATA_X, MPI_COMM_WORLD);
       }
 
       if (world_rank == 0) {
+         if (!increased && receives == sends) { break; }
 
-         WRP_Check worker_check = WRP_Check_for_(MPI_ANY_SOURCE, SIGNAL_WORKER_DONE, MPI_COMM_WORLD);
-         if (worker_check.flag) {
-            MPI_Recv(&dummy_load, 1, MPI_INT, MPI_ANY_SOURCE, SIGNAL_WORKER_DONE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            num_dones += 1;
-         }
-
-         if (num_dones == world_size) { break; }
-
-         WRP_Check worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
-         while(worker_sent_X.flag) {
-            MPI_Recv(&copy_u, 1, MPI_DOUBLE, worker_sent_X.status.MPI_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Recv(copy_X, numX, MPI_INT, worker_sent_X.status.MPI_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+         MPI_Status status;
+         int worker_sent_X;
+         MPI_Iprobe(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, &worker_sent_X, &status);
+         while(worker_sent_X) {
+            // printf("MAIN| receives: %i\n", receives);
+            MPI_Recv(&copy_u, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_U, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(copy_X, numX, MPI_INT, MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            receives += 1;
 
             if (copy_u > bestU) {
                bestU = copy_u;
                memcpy(bestX, copy_X, sizeof(int) * numX);
             }
 
-            worker_sent_X = WRP_Check_for_(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
+            worker_sent_X = WRP_Check_for(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
          }
       }
    }
-
-   MPI_Barrier(MPI_COMM_WORLD);
 
    //----- Rezultatu spausdinimas --------------------------------------------
    if (world_rank == 0) {
