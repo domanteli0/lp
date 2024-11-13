@@ -9,6 +9,7 @@
 #include <limits.h>
 #include "wrappers.h"
 #include "shared.h"
+#include "matrix.h"
 
 //===== Globalus kintamieji ===================================================
 
@@ -18,7 +19,7 @@ const int numCL = 50;	  // Kandidatu naujiems objektams skaicius (candidate loca
 const int numX = 3;	  // Nauju objektu skaicius
 
 double **demandPoints;	 // Geografiniai duomenys
-double **distanceMatrix; // Masyvas atstumu matricai saugoti
+double *distanceMatrix; // Masyvas atstumu matricai saugoti
 
 // int X[numX];        // Naujas sprendinys
 // int bestX[numX];    // Geriausias rastas sprendinys
@@ -52,12 +53,6 @@ void printX(int *X);
 
 int world_size;
 
-struct UX {
-   double u;
-   int *X;
-} ux;
-
-
 int main(int argc, char **argv) {
    MPI_Init(&argc, &argv);
 
@@ -78,16 +73,37 @@ int main(int argc, char **argv) {
    MPI_Buffer_attach(buffer, buffer_size);
 
    //----- Atstumu matricos skaiciavimas -------------------------------------
-   distanceMatrix = calloc(sizeof(double *), numDP);
-   for (int i = 0; i < numDP; i++) {
-      distanceMatrix[i] = calloc(sizeof(double), i + 1);
+   int *lens = lengths(numDP, world_size);
+   int *counts = calloc(sizeof(int), world_size);
+   for (int ix = 0; ix < world_size; ++ix) {
+      counts[ix] = (lens[ix + 1] - lens[ix]) * numDP;
+   }
+
+   int *disps = calloc(sizeof(int), world_size);
+   for (int ix = 0; ix < world_size; ++ix) {
+      disps[ix] = lens[ix] * numDP;
+   }
+
+   distanceMatrix = calloc(sizeof(double), numDP * numDP);
+   for (int i = lens[world_rank]; i < lens[world_rank + 1]; i++) {
       for (int j = 0; j <= i; j++) {
-         distanceMatrix[i][j] = HaversineDistance4(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
+         distanceMatrix[numDP * i + j] =
+            HaversineDistance4(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
       }
    }
 
-   printf("BARRIER A REACHED FROM %i\n", world_rank);
-   MPI_Barrier(MPI_COMM_WORLD);
+   // MPI_Request req;
+   MPI_Allgatherv(
+      distanceMatrix + disps[world_rank],
+      counts[world_rank],
+      MPI_DOUBLE,
+      distanceMatrix,
+      counts,
+      disps,
+      MPI_DOUBLE,
+      MPI_COMM_WORLD
+      // ,&req
+   );
 
    double t_matrix = getTime();
    printf("Matricos skaiciavimo trukme: %lf\n", t_matrix - t_start);
@@ -109,6 +125,7 @@ int main(int argc, char **argv) {
 
    int sends = 0;
    int receives = 0;
+   // bool first_run = true;
    while (true) {
       if (world_rank == 0 && increased) {
          for(int ix = 1; ix < world_size; ++ix) {
@@ -127,6 +144,7 @@ int main(int argc, char **argv) {
 
       if (world_rank == 0 && increased) {
          increased = increaseX(X, numX - 1, numCL);
+         // if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
          
          u = evaluateSolution(X);
          if (u > bestU) {
@@ -147,6 +165,7 @@ int main(int argc, char **argv) {
 
          if (master_sent_X) {
             MPI_Recv(X, numX, MPI_INT, 0, DATA_X, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
 
             u = evaluateSolution(X);
             if (bestU < u) { bestU = u; bestX = memcpy(bestX, X, sizeof(int) * numX); }
@@ -222,9 +241,9 @@ double HaversineDistance4(double lat1, double lon1, double lat2, double lon2) {
 
 double HaversineDistance2(int i, int j) {
    if (i >= j)
-      return distanceMatrix[i][j];
+      return distanceMatrix[numDP * i + j];
    else
-      return distanceMatrix[j][i];
+      return distanceMatrix[numDP * j + i];
 }
 
 //=============================================================================
@@ -290,7 +309,7 @@ int increaseX(int *X, int index, int maxindex) {
 
 void write_times(double t_start, double t_matrix, double t_finish) {
    char *filename_buffer = (char *) calloc(sizeof(char), 1000);
-   sprintf(filename_buffer, "results/4_%i.tsv", world_size);
+   sprintf(filename_buffer, "results/5_%i.tsv", world_size);
    FILE *fp = fopen(filename_buffer, "a+");
 
    // FILE *fp = stdout;
