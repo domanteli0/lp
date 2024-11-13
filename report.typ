@@ -11,7 +11,6 @@
   link(label, str(nums.first()))
 }
 
-
 #set figure(
   supplement: [Pav.]
 )
@@ -52,19 +51,23 @@
   level: 1
 ): it => {
   v(1em, weak: true)
-  strong(underline(smallcaps(it.body)))
+  strong(smallcaps(it))
+}
+
+#show raw.where(block: false): it => {
+  box(fill: rgb("#f1f1f1"))[#it]
 }
 
 #show outline.entry.where(
   level: 2
 ): it => {
-  strong(it.body)
+  strong(it)
 }
 
 #show outline.entry.where(
   level: 4
 ): it => {
-  emph(it.body)
+  emph(it)
 }
 
 #outline(
@@ -495,7 +498,7 @@ while(increased) {
 }
 ```
 
-Tuo tarpu pagrindinis laukia tiek `u` ir `X` reikšmių kiek išsiuntė procesams darbuotojams, gavęs reikšmę su didesne `u` reikšme atnauja savo `bestU` ir `bestX` kintamuosius.
+Tuo tarpu pagrindinis procesas laukia tiek `u` ir `X` reikšmių kiek išsiuntė procesams darbuotojams (šis skaičius saugomas kintamajame `sends`), gavęs reikšmę su didesne `u` reikšme atnauja savo `bestU` ir `bestX` kintamuosius.
 
 ```c
 while(increased) {
@@ -694,11 +697,11 @@ while(increased) {
 ) <lab2_fig_1_without_main>
 ])
 
-Šis sprendimas nėra prastas (@lab2_fig_1), bet pilnai neišnaudoja pagrindinio proceso, galima daryti išvadas, kad jis dažnai neturi darbo ir laukio kol galės kitiem procesam išsiųsti atnaujintas `X` reikšmes. Neskaičiuojant pagrindinio proceso (@lab2_fig_1_without_main), t.y. skaičiuojant pagreitėjimą su 8 procesais ištikrųjų paleidžiami 9 procesai, praktiškai pasiekiamas teorinis pagreitėjimas.
+Šis sprendimas nėra pilnai optimalus (@lab2_fig_1), nes pilnai neišnaudoja pagrindinio proceso, galima daryti išvadas, kad jis dažnai neturi darbo ir laukia kol galės kitiem procesam išsiųsti atnaujintas `X` reikšmes. Neskaičiuojant pagrindinio proceso (@lab2_fig_1_without_main), t.y. skaičiuojant pagreitėjimą su 8 procesais ištikrųjų paleidžiami 9 procesai, praktiškai pasiekiamas teorinis pagreitėjimas.
 
 ==== Antras bandymas
 
-Visgi galima padaryti taip, kad pagrindinis procesas irgi skaičiuotu `X` reikšmes. Kad procesai darbuotojai nelauktų, kol pagrindinis procesas baigs skaičiuoti savo dalį, nebelaukiama atsakymo iš procesų darbuotojų, `X` siuntimui pasitelkiamas `MPI_Bsend`.
+Visgi galima pilnai išnaudoti, pagrindinio proceso pajėgumus, kad šis irgi skaičiuotu `X` reikšmes. 
 
 ```c
 while (true) {
@@ -719,8 +722,11 @@ while (true) {
 // ...
 }
 ```
+Kad procesai darbuotojai nelauktų, kol pagrindinis procesas baigs skaičiuoti savo dalį, nebelaukiama atsakymo iš procesų darbuotojų, `X` siuntimui pasitelkiamas `MPI_Bsend`.
 
-Toliau `while` cikle pridedamas paskaičiavimas pagrindiniam procesui ir `SIGNAL_DONE` išsiuntimas, jeigu šiame cikle baigtusi `X` skaičiavimas:
+#pagebreak()
+
+Toliau `while` cikle pridedamas paskaičiavimas pagrindiniam procesui ir `SIGNAL_DONE` išsiuntimas, jeigu šiame cikle būtų pasiektas paskutinis `X` skaičiavimas:
 
 ```c
 while(true) {
@@ -743,8 +749,9 @@ while(true) {
    // ...
 }
 ```
+Pagrindinis procesas 
 
-Procesams darbuotojams pagrinde ne daug kas keičiasi. Jie irgi pakeičia `MPI_Send` į `MPI_Bsend`.
+Procesams darbuotojams ypač daug pakeitimų nereikia. Šie irgi pakeičia `MPI_Send` į `MPI_Bsend`.
 
 ```c
    if (world_rank != 0) {
@@ -768,6 +775,8 @@ Procesams darbuotojams pagrinde ne daug kas keičiasi. Jie irgi pakeičia `MPI_S
 Čia `WRP_Check_for(int source, int tag, MPI_Comm comm)` (apibrėžimas @WRP_Check_for) viduje naudoja `MPI_Iprobe(int source, int tag, MPI_Comm communicator, int* flag, MPI_Status* status)` ir gražina `flag` dalį.
 
 ```c
+while(true) {
+   // ...
    if (world_rank == 0) {
       if (!increased && receives == sends) { break; }
 
@@ -787,8 +796,12 @@ Procesams darbuotojams pagrinde ne daug kas keičiasi. Jie irgi pakeičia `MPI_S
          worker_sent_X = WRP_Check_for(MPI_ANY_SOURCE, DATA_X, MPI_COMM_WORLD);
       }
    }
+}
 ```
 
+Tam kad pagrindinis procesas nelauktų atsakymo iš kitų procesų, naudojamas `MPI_Iprobe` patikrinti ar procesai darbuotojai jau apskaičiavo savo dalį ir išsiuntė žinutes, šios surenkos ir palyginamos pagrindiniame procese.
+
+==== Rezultatai
 
 #let core2 = read_data(file: "../lab2/results/4_2.tsv", column: 2)
 #let all2 = read_data(file: "../lab2/results/4_2.tsv", column: 3)
@@ -880,12 +893,32 @@ Sulygiagretinti matricos skaičiavimus.
 
 === Lygiagretinimas
 
-Tam, kad gerai sulygiagretinti, reikia paskirstyti skaičiavimus taip, kad kiekvienas procesas tūrėtų po tiek pat darbo. Tam panaudojama funkcija `lengths` (Jos apibrėžimas - @choose_interval), kuri parenka tinkamus intervalus, taip, kad kiekvienas procesas paskaičiuotu apytiksliai tiek pat matricos elementų.
+Kad tinkamai sulygiagretinti, reikia paskirstyti skaičiavimus taip, kad kiekvienas procesas tūrėtų po tiek pat darbo. Tam panaudojama funkcija `lengths` (Jos apibrėžimas - @choose_interval), kuri parenka tinkamus intervalus, taip, kad kiekvienas procesas paskaičiuotu apytiksliai tiek pat matricos elementų.
 
 ```c
 int main() {
    // ...
    int *lens = lengths(numDP, world_size);
+
+   distanceMatrix = calloc(sizeof(double), numDP * numDP);
+   for (int i = lens[world_rank]; i < lens[world_rank + 1]; i++) {
+      for (int j = 0; j <= i; j++) {
+         distanceMatrix[numDP * i + j] =
+            HaversineDistance4(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
+      }
+   }
+   // ...
+}
+```
+
+Čia svarbu paminėti, kad `distanceMatrix` tipas buvo pakeistas iš `double **` į `double *` ir atmintis visai matricai priskiriamia iškarto (`calloc(sizeof(double), numDP * numDP)`), prieeiga prie patricos irgi atitinkamai pakeista iš `distanceMatrix[i][j] = v` į `distanceMatrix[i * numDP + j] = v`. Šis pakeitimas iš esmės pakeičia greitaveikos savybės (eksperimentiškai nelygiagretintos programos skaičiavimas sumažėja nuo ~22s iki ~17s), atitinkamai nelygiagretinta  programa, su kuria lygininama lygiagretinta, buvo pakeista, tam kad palyginimai būtų teisingi.
+
+#pagebreak()
+Kai procesas baigia savo dalį, jis nusiunčia kitiem savo dalį ir laukia kitų dalių naudojant `MPI_Allgatherv`.
+
+```c
+int main() {
+   // ...
    int *counts = calloc(sizeof(int), world_size);
    for (int ix = 0; ix < world_size; ++ix) {
       counts[ix] = (lens[ix + 1] - lens[ix]) * numDP;
@@ -896,21 +929,6 @@ int main() {
       disps[ix] = lens[ix] * numDP;
    }
 
-   distanceMatrix = calloc(sizeof(double), numDP * numDP);
-   for (int i = lens[world_rank]; i < lens[world_rank + 1]; i++) {
-      for (int j = 0; j <= i; j++) {
-         distanceMatrix[numDP * i + j] =
-            HaversineDistance4(demandPoints[i][0], demandPoints[i][1], demandPoints[j][0], demandPoints[j][1]);
-      }
-   }
-   // ...
-```
-
-Čia svarbu paminėti, kad `distanceMatrix` tipas buvo pakeistas iš `double **` į `double *` ir atmintis visai matricai priskiriamia iškarto `calloc(sizeof(double), numDP * numDP)`, prieeiga prie patricos irgi atitinkamai pakeista iš `distanceMatrix[i][j] = v` į `distanceMatrix[i * numDP + j] = v`. Kadangi šis pakeitimas iš esmės pakeičia greitaveikos savybės (eksperimentiškai visos programos skaičiavimas sumažėja nuo ~22s iki ~17s), tai pradinė programa, su kuria lygininama lygiagretinta programa, irgi buvo pakeista, tam kad palyginimai būtų teisingi.
-
-Kai procesas baigia savo dalį, jis nusiunčia nusiunčia kitiem procesam savo dalį ir laukia kitų dalių naudojant `MPI_Allgatherv`.
-
-```c
    MPI_Allgatherv(
       distanceMatrix + disps[world_rank],
       counts[world_rank],
@@ -921,23 +939,27 @@ Kai procesas baigia savo dalį, jis nusiunčia nusiunčia kitiem procesam savo d
       MPI_DOUBLE,
       MPI_COMM_WORLD
    )
+   // ...
+}
 ```
 
-Galima pakeisti duomenų apsikeitimą naudojant `MPI_Iallgatherv`, pridedant prieš kiekvieną `evaluateSolution` (nes tik ten ir naudojami matricos duomenys) šią eilutę, tam, kad duomenys pirma būtų pilnai surinkti.
+Galima pakeisti duomenų apsikeitimą naudojant `MPI_Iallgatherv`, pridedant prieš kiekvieną `evaluateSolution` iškvietimą (tik funkcijoje `evaluateSolution` naudojami `distanceMatrix` duomenys), tam, kad visi duomenys būtų pilnai surinkti.
 ```c
 if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; }
 ```
 
-Tiesa tada laiko matavimas tampa šiek tiek netikslus, nes iškart po `MPI_Iallgatherv` nuskaitomas laikas. Galima sakyti, kad matricos skaičiavimas baigiasi tada, kai pirmą kartą prireikia matricos duomenų, t.y.:
+Tiesa, iškart po `MPI_Iallgatherv` nuskaitomas laikas, todėl laiko matavimas tampa šiek tiek apgaulingas. Galima laikyti, kad matricos skaičiavimas baigiasi tada, kai pirmą kartą prireikia matricos duomenų, t.y. prideda ši eilutė prieš kiekvieną funkcijos `evaluateSolution` iškvietimą:
 
 ```c
-if (first_run) { MPI_Wait(&req, MPI_STATUS_IGNORE); first_run = false; t_matrix = getTime(); }
+if (first_run) {
+  MPI_Wait(&req, MPI_STATUS_IGNORE);
+  first_run = false;
+  t_matrix = getTime();
+}
 ```
 
 #pagebreak()
 === Rezultatai
-
-TODO: actual data
 
 #let core1 = read_data(file: "../lab2/results/5_original.tsv", column: 2)
 #let all1 = read_data(file: "../lab2/results/5_original.tsv", column: 3)
@@ -1215,7 +1237,7 @@ int WRP_Check_for(int source, int tag, MPI_Comm comm) {
    return flag;
 }
 ```,
-  caption: [Optimalus intervalus parinkimas]
+  caption: [Funkcija `WRP_Check_for`]
 ) <WRP_Check_for>
 
 #figure(
@@ -1234,6 +1256,6 @@ int *lengths(int leg_length, int process_count) {
     return lenghts;
 }
 ```,
-  caption: [Optimalus intervalus parinkimas]
+  caption: [Optimalus intervalų parinkimas]
 ) <choose_interval>
 
