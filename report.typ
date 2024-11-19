@@ -273,7 +273,7 @@ int *manyXs = new int[NUM_THREADS * numX];
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -308,7 +308,7 @@ int *manyXs = new int[NUM_THREADS * numX];
 
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas nuoseklus]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis, kai matricos skaičiavimas nuoseklus]
 ) <fig1>
 
 Iš @fig1 matoma, kad lygiagretinamos dalies pagreitėjimas seka tiesinį pagreitėjimą. O visos programos pagreitėmijas seka teorinį pagreitėjimą nusakytą pagal Amdalo dėsnį.
@@ -386,7 +386,7 @@ distanceMatrix = new double*[numDP];
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -421,7 +421,7 @@ distanceMatrix = new double*[numDP];
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas]
 ) <fig2>
 ] 
 
@@ -577,7 +577,7 @@ while(increased) {
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -612,7 +612,7 @@ while(increased) {
 
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis]
 )<lab2_fig_1>],
 [
 #let core3 = read_data(file: "../lab2/results/1_3.tsv", column: 2)
@@ -657,7 +657,7 @@ while(increased) {
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -693,7 +693,7 @@ while(increased) {
 
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, neskaičiuojant pagrindinio proceso]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis, neskaičiuojant pagrindinio proceso]
 ) <lab2_fig_1_without_main>
 ])
 
@@ -749,7 +749,6 @@ while(true) {
    // ...
 }
 ```
-Pagrindinis procesas 
 
 Procesams darbuotojams ypač daug pakeitimų nereikia. Šie irgi pakeičia `MPI_Send` į `MPI_Bsend`.
 
@@ -844,7 +843,7 @@ Tam kad pagrindinis procesas nelauktų atsakymo iš kitų procesų, naudojamas `
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -879,7 +878,7 @@ Tam kad pagrindinis procesas nelauktų atsakymo iš kitų procesų, naudojamas `
 
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis]
 )<lab2_fig_4>
 
 Šis metodas pasieka teorinį pagreitėjimą be papildomo proceso.
@@ -911,7 +910,7 @@ int main() {
 }
 ```
 
-Čia svarbu paminėti, kad `distanceMatrix` tipas buvo pakeistas iš `double **` į `double *` ir atmintis visai matricai priskiriamia iškarto (`calloc(sizeof(double), numDP * numDP)`), prieeiga prie patricos irgi atitinkamai pakeista iš `distanceMatrix[i][j] = v` į `distanceMatrix[i * numDP + j] = v`. Šis pakeitimas iš esmės pakeičia greitaveikos savybės (eksperimentiškai nelygiagretintos programos skaičiavimas sumažėja nuo ~22s iki ~17s), atitinkamai nelygiagretinta  programa, su kuria lygininama lygiagretinta, buvo pakeista, tam kad palyginimai būtų teisingi.
+Čia svarbu paminėti, kad `distanceMatrix` tipas buvo pakeistas iš `double **` į `double *` ir atmintis visai matricai priskiriamia iškarto (`calloc(sizeof(double), numDP * numDP)`), prieeiga prie matricos irgi atitinkamai pakeista iš `distanceMatrix[i][j] = v` į `distanceMatrix[i * numDP + j] = v`. Šis pakeitimas iš esmės pakeičia greitaveikos savybės (eksperimentiškai nelygiagretintos programos skaičiavimas sumažėja nuo ~22s iki ~17s), atitinkamai nelygiagretinta programa, su kuria lygininama lygiagretinta, buvo pakeista, tam kad palyginimai būtų teisingi.
 
 #pagebreak()
 Kai procesas baigia savo dalį, jis nusiunčia kitiem savo dalį ir laukia kitų dalių naudojant `MPI_Allgatherv`.
@@ -1005,7 +1004,7 @@ if (first_run) {
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -1041,7 +1040,7 @@ if (first_run) {
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Allgatherv`)]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Allgatherv`)]
 ) <lab2_fig_matrix_5>
 ] 
 
@@ -1088,7 +1087,7 @@ if (first_run) {
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -1125,7 +1124,7 @@ if (first_run) {
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas iškart po `MPI_Iallgatherv`]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas iškart po `MPI_Iallgatherv`]
 ) <lab2_fig_matrix_6>
 ],
 [
@@ -1181,7 +1180,7 @@ if (first_run) {
       x-tick-step: 1,
       y-tick-step: 1,
       y-minor-tick-step: 0.5,
-      x-label: [Procesorių skaičius],
+      x-label: [Procesų skaičius],
       y-label: [Pagreitėjimas],
       x-grid: true,
       y-grid: true,
@@ -1218,7 +1217,7 @@ if (first_run) {
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir Procesorių skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas kai matricos prireikia pirmą kartą]
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas kai matricos prireikia pirmą kartą]
 ) <lab2_fig_matrix_7>],
 [
 ])
