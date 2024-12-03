@@ -1,13 +1,13 @@
 
-#let read_data(file: "", column: 1) = {
+#let read_data(file: "", column: 1, average_count: 3) = {
   let results = csv(file, delimiter: "\t")
 
   let values = results
     .map(r => float(r.at(column)))
-    .slice(0, count: 3)
+    .slice(0, count: average_count)
     .sum()
   
-  values / 3
+  values / average_count
 }
 
 // #let data(files: (), column: 1) = {

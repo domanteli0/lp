@@ -1161,7 +1161,7 @@ if (first_run) {
 #let data_matrix = (
   (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
 )
-  
+
 #figure(
   placement: none,
 [
@@ -1217,10 +1217,323 @@ if (first_run) {
   
 ],
   supplement: "Fig. ",
-  caption: [Pagreitėjimo ir procesų skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas kai matricos prireikia pirmą kartą]
-) <lab2_fig_matrix_7>],
+  caption: [Pagreitėjimo ir procesų skaičiaus santykis, kai matricos skaičiavimas sulygiagretintas (`MPI_Iallgatherv`), kai laikas nuskaitomas, kai matricos prireikia pirmą kartą]
+) <lab2_fig_matrix_7>],[])
+
+
+#pagebreak()
+= Užduotis \#3
+
+Sulygiagretintą paskirstytos atminties programą paleisti naudojantis MIF superkompiuteriu. 
+
+== Resultatai
+
+Eksperimentui naudojama versija, kurioje matricos skaičiavimas sulygiagretintas naudojant `MPI_Iallgatherv` ir laikas nuskaitomas, kai matricos prireikia pirmą kartą.
+
+#let core1 = read_data(file: "../lab3/original.tsv", column: 2)
+#let all1 = read_data(file: "../lab3/original.tsv", column: 3)
+#let matrix1 = read_data(file: "../lab3/original.tsv", column: 1)
+
+#let core2 = read_data(file: "../lab3/parallel_2.tsv", column: 2)
+#let all2 = read_data(file: "../lab3/parallel_2.tsv", column: 3)
+#let matrix2 = read_data(file: "../lab3/parallel_2.tsv", column: 1)
+
+#let core4 = read_data(file: "../lab3/parallel_4.tsv", column: 2)
+#let all4 = read_data(file: "../lab3/parallel_4.tsv", column: 3)
+#let matrix4 = read_data(file: "../lab3/parallel_4.tsv", column: 1)
+
+#let core8 = read_data(file: "../lab3/parallel_8.tsv", column: 2)
+#let all8 = read_data(file: "../lab3/parallel_8.tsv", column: 3)
+#let matrix8 = read_data(file: "../lab3/parallel_8.tsv", column: 1)
+
+#let core16 = read_data(file: "../lab3/parallel_16.tsv", column: 2)
+#let all16 = read_data(file: "../lab3/parallel_16.tsv", column: 3)
+#let matrix16 = read_data(file: "../lab3/parallel_16.tsv", column: 1)
+
+#let core32 = read_data(file: "../lab3/parallel_32.tsv", column: 2)
+#let all32 = read_data(file: "../lab3/parallel_32.tsv", column: 3)
+#let matrix32 = read_data(file: "../lab3/parallel_32.tsv", column: 1)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8)
+)
+
+#figure(
+  placement: none,
 [
-])
+  #canvas({
+    import draw: *
+
+    // set-style(
+    //   axes: (stroke: .5pt, tick: (stroke: .5pt)),
+    //   legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+    // )
+    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+
+    plot.plot(
+      x-min: 0.9, x-max: 8.1,
+      y-min: 0.9, y-max: 8.1,
+      size: (10, 6),
+      x-tick-step: 1,
+      y-tick-step: 1,
+      y-minor-tick-step: 0.5,
+      x-label: [Mazgų skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      // legend: "inner-north-west",
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: [Sprendimo paieškos pagreitėjimas]
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: [Programos pagreitėjimas]
+        )
+
+        plot.add(
+          data_matrix,
+          // mark: "x", mark-size: 0.15,
+          style: (stroke: (paint: orange)), 
+          label: [Matricos skaičiavimo pagreitėjimas]
+        )
+
+        plot.add(
+          (x) => x,
+          domain: (1, 8),
+          style: (stroke: (paint: blue)), 
+          label: [Tiesinis pagreitėjimas]
+        )
+      })
+  })
+  
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir mazgų skaičiaus santykis (iki 8 mazgų)]
+) <lab3_max8>
+
+Eksperimentiniu būdu nustatytas matricos pagreitėjimas sumažėjęs palyginus su @lab2_fig_matrix_7. Tai ypač matosi su 8 mazgais, kur matricos skaičiavimo pagreitėjimas nuo 7,5 sumažėja iki 6,5. Pats sprendimo paieškos pagreitėjimas nepasikeičia, o visos programos suletėja dėl matricos skaičiavimo dalies.
+
+// ====================================================================
+
+
+#let data_core = (
+  (2, core1 / core2), (4, core1 / core4), (8, core1 / core8), (16, core1 / core16), (32, core1 / core32)
+)
+#let data_all = (
+  (2, all1 / all2), (4, all1 / all4), (8, all1 / all8), (16, all1 / all16), (32, all1 / all32)
+)
+#let data_matrix = (
+  (2, matrix1 / matrix2), (4, matrix1 / matrix4), (8, matrix1 / matrix8), (16, matrix1 / matrix16), (32, matrix1 / matrix32)
+)
+
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    // set-style(
+    //   axes: (stroke: .5pt, tick: (stroke: .5pt)),
+    //   legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+    // )
+    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+
+    plot.plot(
+      x-min: 0.9, x-max: 32.1,
+      y-min: 0.9, y-max: 32.1,
+      size: (10, 6),
+      x-tick-step: 4,
+      y-tick-step: 4,
+      y-minor-tick-step: 1,
+      x-label: [Mazgų skaičius],
+      y-label: [Pagreitėjimas],
+      x-grid: true,
+      y-grid: true,
+      // legend: "inner-north-west",
+      {
+
+        plot.add(
+          data_core,
+          style: (stroke: (paint: green, dash: "dashed")), 
+          label: [Sprendimo paieškos pagreitėjimas]
+        )
+
+        plot.add(
+          data_all,
+          style: (stroke: (paint: rgb("#e64914"), dash: "dashed")), 
+          label: [Programos pagreitėjimas]
+        )
+
+        plot.add(
+          data_matrix,
+          // mark: "x", mark-size: 0.15,
+          style: (stroke: (paint: orange)), 
+          label: [Matricos skaičiavimo pagreitėjimas]
+        )
+
+        plot.add(
+          (x) => x,
+          domain: (1, 32),
+          style: (stroke: (paint: blue)), 
+          label: [Tiesinis pagreitėjimas]
+        )
+      })
+  })
+  
+],
+  supplement: "Fig. ",
+  caption: [Pagreitėjimo ir mazgų skaičiaus santykis (iki 32 mazgų)]
+) <lab3_max32>
+
+Idomumo dėliai, galima įvertinti pagreitėjimą ir su 16 bei 32 mazgais. Sprendimo paieška atsilieka nuo nuo teorinės. Čia taip pat išryškėja matricos skaičiavimo pagreitėjimo stagnacija.
+Pagrindinė to priežąstis tikriausiai yra tai, kad pasiektas minimalus komunikacijos tarp mazgų laikas (kas nežymai matosi ir su 8 mazgais). Su vis didesniu mazgų kiekiu, vis didesnė dalis laiko yra skirta žinučių pristatymui.
+
+
+
+#let matrix2 = read_data(file: "../lab3/parallel_2_extra.tsv", column: 6, average_count: 10)
+#let waiting2 = read_data(file: "../lab3/parallel_2_extra.tsv", column: 5, average_count: 10)
+
+#let matrix4 = read_data(file: "../lab3/parallel_4_extra.tsv", column: 6, average_count: 20)
+#let waiting4 = read_data(file: "../lab3/parallel_4_extra.tsv", column: 5, average_count: 20)
+
+#let matrix8 = read_data(file: "../lab3/parallel_8_extra.tsv", column: 6, average_count: 40)
+#let waiting8 = read_data(file: "../lab3/parallel_8_extra.tsv", column: 5, average_count: 40)
+
+#let matrix16 = read_data(file: "../lab3/parallel_16_extra.tsv", column: 6, average_count: 80)
+#let waiting16 = read_data(file: "../lab3/parallel_16_extra.tsv", column: 5, average_count: 80)
+
+#let matrix32 = read_data(file: "../lab3/parallel_32_extra.tsv", column: 6, average_count: 160)
+#let waiting32 = read_data(file: "../lab3/parallel_32_extra.tsv", column: 5, average_count: 160)
+
+#let data_matrix = ((2, matrix2), (4, matrix4), (8, matrix8), (16, matrix16), (32, matrix32))
+#let data_waiting = ((2, waiting2), (4, waiting4), (8, waiting8), (16, waiting16), (32, waiting32))
+#let data_matrix_added = data_matrix.zip(data_waiting).map((x) => (x.at(0).at(0), x.at(1).at(1) + x.at(0).at(1)))
+
+#let data_matrix_normalized = data_matrix.map((x) => (x.at(0), x.at(0) * x.at(1)))
+#let data_waiting_normalized = data_waiting.map((x) => (x.at(0), x.at(0) * x.at(1)))
+
+// #grid(
+//   columns: 2,
+//   gutter: 2mm,
+// [
+// #figure(
+//   placement: none,
+// [
+//   #canvas({
+//     import draw: *
+
+//     // set-style(
+//     //   axes: (stroke: .5pt, tick: (stroke: .5pt)),
+//     //   legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+//     // )
+//     set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+//               legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+
+//     plot.plot(
+//       x-min: 2, x-max: 32.1,
+//       y-min: 0.0, y-max: 8.1,
+//       size: (7, 5),
+//       x-tick-step: 4,
+//       y-tick-step: 1,
+//       x-label: [Mazgų skaičius],
+//       y-label: [CPU Laikas (_s_)],
+//       x-grid: true,
+//       y-grid: true,
+//       legend: "inner-north-west",
+//       {
+
+//         plot.add(
+//           data_matrix_normalized,
+//           style: (stroke: (paint: rgb("#1476d2"))), 
+//           label: [Matricos skaičiavimas]
+//         )
+
+//         plot.add(
+//           data_waiting_normalized,
+//           style: (stroke: (paint: rgb("#d30808"))), 
+//           label: [Matricos skaičiavimo laukimas]
+//         )
+//       })
+//   })
+  
+// ],
+//   supplement: "Fig. ",
+//   caption: [Visas laikas praleistas per visus mazgus skaičiuojant matricą ir laukiant jos duomenų]
+// ) <lab3_waiting_normalized>],
+
+#figure(
+  placement: none,
+[
+  #canvas({
+    import draw: *
+
+    set-style(
+      axes: (stroke: .5pt, tick: (stroke: .5pt)),
+      legend: (stroke: none, fill: none, orientation: ttb, item: (spacing: .1), scale: 40%),
+    )
+    set-style(axes: (stroke: .5pt, tick: (stroke: .5pt)),
+              legend: (stroke: none, orientation: ttb, item: (spacing: .3), scale: 80%))
+
+    plot.plot(
+      x-min: 2, x-max: 32.1,
+      y-min: 0.0, y-max: 1.1,
+      size: (10, 6),
+      x-tick-step: 4,
+      y-tick-step: 0.25,
+      x-label: [Mazgų skaičius],
+      y-label: [Laikas (s)],
+      x-grid: true,
+      y-grid: true,
+      legend: "inner-north-east",
+      {
+
+        plot.add(
+          data_matrix_added,
+          fill: true,
+          style: (stroke: (thickness: 0pt)),
+          label: [Matricos skaičiavimas]
+        )
+
+        plot.add(
+          data_waiting,
+          fill: true,
+          style: (stroke: (paint: rgb("#e64914"), thickness: 0pt)), 
+          label: [Matricos reikšmės laukimas]
+        )
+      })
+  })
+  
+],
+  supplement: "Fig. ",
+  caption: [Vidutinis laikas praleistas skaičiuojant matricos reikšmę (sudėjus laukimą ir skaičiavimą)]
+) <lab3_waiting>
+
+Iš @lab3_waiting galima įsitikinti, jog žinučių laukimo laikas yra pagrindinė stagnacijos priežąstis. Matoma, jog virš 16 mazgų, pagreitėjimo naudą nustelbia žinučių laukimo kaštai.
+
 
 #pagebreak()
 = Priedai <appendixes>
@@ -1257,4 +1570,3 @@ int *lengths(int leg_length, int process_count) {
 ```,
   caption: [Optimalus intervalų parinkimas]
 ) <choose_interval>
-

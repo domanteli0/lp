@@ -1,0 +1,5 @@
+= Lab3
+
+== Running
+
+. `sbatch flpenum.sh`
